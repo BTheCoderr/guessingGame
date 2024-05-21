@@ -1,6 +1,6 @@
 body {
   font-family: Arial, sans-serif;
-  background-color: #f3f3f3;
+  background-color: #f4f4f4;
   margin: 0;
   padding: 0;
   display: flex;
@@ -11,39 +11,41 @@ body {
 
 .container {
   background-color: #fff;
-  padding: 20px;
-  border-radius: 5px;
+  border-radius: 8px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  padding: 20px;
   text-align: center;
 }
 
 h1 {
-  margin-top: 0;
+  color: #333;
+}
+
+label {
+  font-weight: bold;
 }
 
 input[type="number"] {
-  padding: 8px;
+  width: 50%;
+  padding: 10px;
   margin: 10px 0;
-  width: 100px;
   border: 1px solid #ccc;
-  border-radius: 5px;
+  border-radius: 4px;
 }
 
 button {
   padding: 10px 20px;
-  font-size: 16px;
-  cursor: pointer;
   background-color: #007bff;
   color: #fff;
   border: none;
-  border-radius: 5px;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 button:hover {
   background-color: #0056b3;
 }
 
-p#error-message {
-  color: red;
-  margin-top: 10px;
+p {
+  color: #666;
 }

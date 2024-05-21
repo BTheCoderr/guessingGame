@@ -9,11 +9,22 @@
 <body>
   <div class="container">
     <h1>Number Guessing Game</h1>
-    <p>Guess a number between <span id="min-number"></span> and <span id="max-number"></span>.</p>
+    <label for="difficulty">Choose a difficulty:</label>
+    <select id="difficulty">
+      <option value="easy">Easy (1-10)</option>
+      <option value="medium">Medium (1-100)</option>
+      <option value="hard">Hard (1-1000)</option>
+    </select>
+    <p>Guess a number between <span id="min-number">1</span> and <span id="max-number">10</span>.</p>
     <input type="number" id="guess-input" placeholder="Enter your guess">
     <button id="guess-btn">Guess</button>
     <p id="result"></p>
+    <p id="hint"></p>
+    <p id="score">Score: 0</p>
+    <p id="level">Level: 1</p>
+    <p id="hints">Hints: 3</p>
+    <p id="timer">Time: 30</p>
   </div>
-  <script src="guessingGame.js"></script>
+  <script src="guessGame.js"></script>
 </body>
 </html>
