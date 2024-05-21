@@ -36,14 +36,3 @@ This is a simple number guessing game where the player has to guess a random num
     ```
 3. Open your web browser and go to `http://localhost:3000` to start playing the game.
 <br><br>
-
-/Users/bthemogul/Desktop/Screenshot 2024-05-21 at 8.51.17 AM.png 
-<br><br>
-/Users/bthemogul/Desktop/Screenshot 2024-05-21 at 8.50.06 AM.png 
-<br><br>
-/Users/bthemogul/Desktop/Screenshot 2024-05-21 at 8.49.54 AM.png 
-<br><br>
-/Users/bthemogul/Desktop/Screenshot 2024-05-21 at 8.49.34 AM.png 
-<br><br>
-/Users/bthemogul/Desktop/Screenshot 2024-05-21 at 8.49.24 AM.png
-<br><br>
