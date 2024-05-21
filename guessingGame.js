@@ -6,7 +6,7 @@ let level = 1
 const maxHints = 3
 let hintsUsed = 0
 let timer
-const timeLimit = 30
+const timeLimit = 30 // seconds
 let timerStarted = false
 
 const setDifficulty = () => {
@@ -38,6 +38,9 @@ const startGame = () => {
   attempts = 0
   hintsUsed = 0
   timerStarted = false
+  if (timer) {
+    clearInterval(timer)
+  }
 }
 
 const startTimer = () => {
@@ -54,7 +57,7 @@ const startTimer = () => {
 }
 
 document.getElementById('difficulty').addEventListener('change', setDifficulty)
-document.getElementById('difficulty').dispatchEvent(new Event('change')) 
+document.getElementById('difficulty').dispatchEvent(new Event('change')) // Initialize on load
 
 document.getElementById('guess-btn').addEventListener('click', () => {
   if (!timerStarted) {
@@ -68,9 +71,9 @@ document.getElementById('guess-btn').addEventListener('click', () => {
     score += 100 - attempts
     document.getElementById('result').innerText = `Correct! The number was ${randomNumber}.`
     level++
-    maxNumber *= 2
+    maxNumber *= 2 // Increase the maximum range for the next level
     clearInterval(timer)
-    setTimeout(startGame, 2000)
+    setTimeout(startGame, 2000) // Start the next level after a short delay
   } else {
     document.getElementById('result').innerText = guess > randomNumber ? 'Too high!' : 'Too low!'
     if (attempts > maxHints && hintsUsed < maxHints) {
