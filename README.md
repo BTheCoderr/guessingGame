@@ -1,39 +1,44 @@
 # Guess Arcade
 
-A polished local-first revival of the original Number Guessing Game.
+A local-first revival of the original Number Guessing Game, rebuilt into a small browser arcade.
 
-The original project was a small HTML/CSS/JavaScript experiment with one guessing loop. Version 2 keeps that mechanic and turns it into a responsive arcade that works without accounts, cloud storage, or a database.
+## v3 fun pass
 
-## v2 features
+The core higher/lower game is still the point, but it now has enough game systems around it to feel like an arcade instead of a demo.
 
-- Five modes: Classic, Sprint, Survival, Endless, and Daily
-- Progressive number ranges and level-based scoring
-- Hot / warm / cold feedback plus higher / lower signals
-- Hints, timers, lives, and seven-guess daily rules depending on mode
-- Date-seeded daily challenge
-- Persistent player stats, game history, win streaks, and records
-- Six unlockable achievements
-- Light, dark, and system themes
-- Optional sound and haptic feedback
+### Six modes
+
+- **Classic** — progressive levels, combos, jackpot rounds, and power-ups
+- **Sprint** — solve as many targets as possible in 60 seconds
+- **Survival** — four misses costs a life; the run ends when all lives are gone
+- **Endless** — the number range keeps expanding
+- **Daily** — one date-seeded target with seven guesses and no power-ups
+- **Duel** — pass-the-phone two-player mode; alternate after every miss and race to three round wins
+
+### Arcade systems
+
+- Quick-win combo multiplier up to 2x
+- Every third solo level becomes a 2x Jackpot Round
+- Heat Check challenge: three quick wins earns a +100 bonus
+- Three one-use Power Deck cards per run:
+  - Scanner narrows the target range
+  - Double Up doubles the next correct hit
+  - Lucky Break gives a mode-specific bonus
+- Hot / warm / cold proximity feedback and one-away callouts
+- Win flashes, confetti, haptics, and arcade sound cues
+- Ten achievements
+- Persistent stats, records, game history, and daily results
 - JSON backup and restore
+- Light, dark, and system themes
 - Shareable results
-- Responsive mobile-first interface
-- Installable PWA with an offline app shell
-- No account system or database required
+- Responsive mobile-first UI
+- Installable PWA with offline app shell
 
-## Storage
+## Local-first storage
 
-Guess Arcade stores gameplay data in `localStorage` under `guess-arcade-v2`.
+Guess Arcade stores player data in `localStorage` under `guess-arcade-v2`. The storage key stays the same so existing v2 players keep their history and settings; new v3 stats are merged in automatically.
 
-That includes:
-
-- stats and records
-- recent game history
-- unlocked achievements
-- daily challenge results
-- theme, sound, and haptic preferences
-
-Data stays on the device unless the player exports a JSON backup.
+There is no login, cloud database, secret, or environment variable required.
 
 ## Run locally
 
@@ -44,12 +49,10 @@ npm start
 
 Then open `http://localhost:3000`.
 
-Because the app is static, it can also be served by any static web server.
-
 ## Deploy
 
-`netlify.toml` publishes the repository root directly. No environment variables, database, or secrets are required.
+`netlify.toml` publishes the repository root directly. Netlify can deploy straight from `master`.
 
 ## Legacy route
 
-`guessingGame.html` is retained as a compatibility redirect to the new `index.html` experience.
+`guessingGame.html` remains as a compatibility redirect to `index.html`.

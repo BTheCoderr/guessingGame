@@ -1,58 +1,54 @@
 (() => {
   const STORAGE_KEY = 'guess-arcade-v2';
+
   const MODES = {
-    classic: { label: 'Classic', startMax: 25, timed: false, hints: 3, subtitle: 'Find the target and build your score.' },
-    sprint: { label: 'Sprint', startMax: 50, timed: true, seconds: 60, hints: 2, subtitle: 'Solve as many rounds as you can before time runs out.' },
-    survival: { label: 'Survival', startMax: 40, timed: false, hints: 1, lives: 3, subtitle: 'Miss too many times and the run is over.' },
-    endless: { label: 'Endless', startMax: 20, timed: false, hints: 3, subtitle: 'No finish line. Every win pushes the range higher.' },
-    daily: { label: 'Daily', startMax: 100, timed: false, hints: 0, dailyAttempts: 7, subtitle: 'One date-seeded puzzle. Seven attempts.' }
+    classic: { label:'Classic', startMax:25, hints:3, subtitle:'Climb levels, build combos, hit jackpot rounds.' },
+    sprint: { label:'Sprint', startMax:50, hints:2, timed:true, seconds:60, subtitle:'Solve as many targets as possible before time disappears.' },
+    survival: { label:'Survival', startMax:40, hints:1, lives:3, subtitle:'Four misses costs a life. Protect all three.' },
+    endless: { label:'Endless', startMax:20, hints:3, subtitle:'No finish line. The range keeps getting meaner.' },
+    daily: { label:'Daily', startMax:100, hints:0, dailyAttempts:7, subtitle:'One date-seeded target. Seven tries. No boosts.' },
+    duel: { label:'Duel', startMax:50, hints:0, subtitle:'Pass the phone. Alternate guesses. First player to three rounds wins.' }
   };
 
   const ACHIEVEMENTS = [
-    { id: 'first-win', icon: '✓', name: 'First Hit', description: 'Win your first game.', test: s => s.wins >= 1 },
-    { id: 'sharp', icon: '⌖', name: 'Sharpshooter', description: 'Solve a round in 3 guesses.', test: s => s.bestAttempts > 0 && s.bestAttempts <= 3 },
-    { id: 'speed', icon: '⚡', name: 'Quick Read', description: 'Solve a round in under 10 seconds.', test: s => s.fastestWinMs > 0 && s.fastestWinMs < 10000 },
-    { id: 'streak', icon: '↗', name: 'On Fire', description: 'Reach a 3-game win streak.', test: s => s.bestStreak >= 3 },
-    { id: 'score', icon: '★', name: 'High Roller', description: 'Score 500+ in one run.', test: s => s.bestScore >= 500 },
-    { id: 'daily', icon: '◫', name: 'Daily Mind', description: 'Complete a daily challenge.', test: s => s.dailyCompleted >= 1 }
+    { id:'first-win', icon:'✓', name:'First Hit', description:'Win your first solo round.', test:s => s.wins >= 1 },
+    { id:'sharp', icon:'⌖', name:'Sharpshooter', description:'Solve a round in 3 guesses or fewer.', test:s => s.bestAttempts > 0 && s.bestAttempts <= 3 },
+    { id:'ace', icon:'1', name:'Called It', description:'Hit a target on the first guess.', test:s => s.perfectWins >= 1 },
+    { id:'speed', icon:'⚡', name:'Quick Read', description:'Solve a round in under 10 seconds.', test:s => s.fastestWinMs > 0 && s.fastestWinMs < 10000 },
+    { id:'streak', icon:'↗', name:'On Fire', description:'Reach a 3-round win streak.', test:s => s.bestStreak >= 3 },
+    { id:'combo', icon:'🔥', name:'Combo King', description:'Reach a 4-hit combo.', test:s => s.bestCombo >= 4 },
+    { id:'score', icon:'★', name:'High Roller', description:'Score 500+ in one run.', test:s => s.bestScore >= 500 },
+    { id:'jackpot', icon:'×2', name:'Jackpot', description:'Clear a double-score jackpot round.', test:s => s.bonusWins >= 1 },
+    { id:'daily', icon:'◫', name:'Daily Mind', description:'Complete a daily challenge.', test:s => s.dailyCompleted >= 1 },
+    { id:'duel', icon:'⚔', name:'Face Off', description:'Finish a two-player Duel match.', test:s => s.duelMatches >= 1 }
   ];
 
   const defaultState = () => ({
-    version: 2,
-    stats: {
-      gamesPlayed: 0,
-      wins: 0,
-      bestScore: 0,
-      currentStreak: 0,
-      bestStreak: 0,
-      totalGuesses: 0,
-      fastestWinMs: 0,
-      bestAttempts: 0,
-      dailyCompleted: 0
+    version:3,
+    stats:{
+      gamesPlayed:0, wins:0, bestScore:0, currentStreak:0, bestStreak:0,
+      totalGuesses:0, fastestWinMs:0, bestAttempts:0, dailyCompleted:0,
+      perfectWins:0, bestCombo:0, bonusWins:0, duelMatches:0
     },
-    history: [],
-    unlocked: [],
-    daily: {},
-    settings: {
-      theme: 'dark',
-      sound: true,
-      haptics: true
-    }
+    history:[],
+    unlocked:[],
+    daily:{},
+    settings:{ theme:'dark', sound:true, haptics:true }
   });
 
   const loadState = () => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (!saved || typeof saved !== 'object') return defaultState();
       const base = defaultState();
+      if (!saved || typeof saved !== 'object') return base;
       return {
         ...base,
         ...saved,
-        stats: { ...base.stats, ...(saved.stats || {}) },
-        settings: { ...base.settings, ...(saved.settings || {}) },
-        history: Array.isArray(saved.history) ? saved.history : [],
-        unlocked: Array.isArray(saved.unlocked) ? saved.unlocked : [],
-        daily: saved.daily && typeof saved.daily === 'object' ? saved.daily : {}
+        stats:{ ...base.stats, ...(saved.stats || {}) },
+        settings:{ ...base.settings, ...(saved.settings || {}) },
+        history:Array.isArray(saved.history) ? saved.history : [],
+        unlocked:Array.isArray(saved.unlocked) ? saved.unlocked : [],
+        daily:saved.daily && typeof saved.daily === 'object' ? saved.daily : {}
       };
     } catch {
       return defaultState();
@@ -62,61 +58,40 @@
   let persistent = loadState();
   let session = {};
   let timerId = null;
-  let deferredInstallPrompt = null;
   let toastTimer = null;
+  let deferredInstallPrompt = null;
 
   const $ = id => document.getElementById(id);
   const els = {
-    form: $('guess-form'),
-    input: $('guess-input'),
-    guessButton: $('guess-button'),
-    modeKicker: $('mode-kicker'),
-    modeTitle: $('mode-title'),
-    modeDescription: $('mode-description'),
-    rangePill: $('range-pill'),
-    rangeCopy: $('range-copy'),
-    signalCard: $('signal-card'),
-    signalOrb: $('signal-orb'),
-    signalLabel: $('signal-label'),
-    signalText: $('signal-text'),
-    meterFill: $('meter-fill'),
-    score: $('score-value'),
-    attempts: $('attempts-value'),
-    timerLabel: $('timer-label'),
-    timer: $('timer-value'),
-    resourceLabel: $('resource-label'),
-    resource: $('resource-value'),
-    hintButton: $('hint-button'),
-    hintsLeft: $('hints-left'),
-    guessHistory: $('guess-history'),
-    resultActions: $('result-actions'),
-    nextButton: $('next-button'),
-    shareButton: $('share-button'),
-    newGameButton: $('new-game-button'),
-    dailyDate: $('daily-date'),
-    dailyStatus: $('daily-status'),
-    playDailyButton: $('play-daily-button'),
-    achievementList: $('achievement-list'),
-    achievementCount: $('achievement-count'),
-    heroBestScore: $('hero-best-score'),
-    heroStreak: $('hero-streak'),
-    heroGames: $('hero-games'),
-    statsDialog: $('stats-dialog'),
-    settingsDialog: $('settings-dialog'),
-    statsGrid: $('stats-grid'),
-    gameHistory: $('game-history'),
-    soundToggle: $('sound-toggle'),
-    hapticsToggle: $('haptics-toggle'),
-    themeSelect: $('theme-select'),
-    themeToggle: $('theme-toggle'),
-    exportButton: $('export-button'),
-    importInput: $('import-input'),
-    resetDataButton: $('reset-data-button'),
-    installButton: $('install-button'),
-    toast: $('toast')
+    gameCard:$('game-card'),
+    form:$('guess-form'), input:$('guess-input'), guessButton:$('guess-button'), guessLabel:$('guess-label'),
+    modeKicker:$('mode-kicker'), modeTitle:$('mode-title'), modeDescription:$('mode-description'),
+    rangePill:$('range-pill'), rangeCopy:$('range-copy'),
+    comboPill:$('combo-pill'), comboValue:$('combo-value'), jackpotPill:$('jackpot-pill'),
+    duelBoard:$('duel-scoreboard'), duelP1:$('duel-player-1'), duelP2:$('duel-player-2'),
+    duelScore1:$('duel-score-1'), duelScore2:$('duel-score-2'), duelRound:$('duel-round'),
+    signalCard:$('signal-card'), signalOrb:$('signal-orb'), signalLabel:$('signal-label'), signalText:$('signal-text'),
+    meterFill:$('meter-fill'), score:$('score-value'), attempts:$('attempts-value'),
+    metricOneLabel:$('metric-one-label'), metricTwoLabel:$('metric-two-label'),
+    timerLabel:$('timer-label'), timer:$('timer-value'), resourceLabel:$('resource-label'), resource:$('resource-value'),
+    hintButton:$('hint-button'), hintsLeft:$('hints-left'),
+    powerDeck:$('power-deck'), powerScan:$('power-scan'), powerDouble:$('power-double'), powerLucky:$('power-lucky'),
+    guessHistory:$('guess-history'), resultActions:$('result-actions'), nextButton:$('next-button'), shareButton:$('share-button'),
+    newGameButton:$('new-game-button'),
+    challengeTitle:$('challenge-title'), challengeStatus:$('challenge-status'), challengeCopy:$('challenge-copy'), challengeFill:$('challenge-fill'),
+    dailyDate:$('daily-date'), dailyStatus:$('daily-status'), playDailyButton:$('play-daily-button'),
+    achievementList:$('achievement-list'), achievementCount:$('achievement-count'),
+    heroBestScore:$('hero-best-score'), heroCombo:$('hero-combo'), heroGames:$('hero-games'),
+    statsDialog:$('stats-dialog'), settingsDialog:$('settings-dialog'), statsGrid:$('stats-grid'), gameHistory:$('game-history'),
+    soundToggle:$('sound-toggle'), hapticsToggle:$('haptics-toggle'), themeSelect:$('theme-select'), themeToggle:$('theme-toggle'),
+    exportButton:$('export-button'), importInput:$('import-input'), resetDataButton:$('reset-data-button'), installButton:$('install-button'),
+    toast:$('toast'), confetti:$('confetti-layer')
   };
 
   const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(persistent));
+  const randomTarget = max => Math.floor(Math.random() * max) + 1;
+  const getModeConfig = () => MODES[session.mode] || MODES.classic;
+
   const todayKey = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -134,9 +109,16 @@
   const formatTime = ms => {
     if (!ms || ms < 0) return '—';
     const seconds = Math.floor(ms / 1000);
-    if (seconds < 60) return `${seconds}s`;
-    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2,'0')}`;
+    return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
   };
+
+  const comboMultiplier = combo => {
+    if (combo <= 1) return 1;
+    return Math.min(2, 1 + (combo - 1) * .25);
+  };
+
+  const isJackpotLevel = () =>
+    ['classic','survival','endless'].includes(session.mode) && session.level > 1 && session.level % 3 === 0;
 
   const toast = message => {
     els.toast.textContent = message;
@@ -145,10 +127,7 @@
     toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2200);
   };
 
-  const feedback = type => {
-    if (persistent.settings.haptics && navigator.vibrate) {
-      navigator.vibrate(type === 'win' ? [35, 30, 55] : type === 'miss' ? 25 : 15);
-    }
+  const tone = (frequency, duration=.1, type='sine', volume=.035, delay=0) => {
     if (!persistent.settings.sound) return;
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -156,15 +135,52 @@
       const ctx = new AudioCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.value = type === 'win' ? 740 : type === 'miss' ? 180 : 420;
-      gain.gain.setValueAtTime(.035, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + .12);
-      osc.start();
-      osc.stop(ctx.currentTime + .12);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = type;
+      osc.frequency.value = frequency;
+      const start = ctx.currentTime + delay;
+      gain.gain.setValueAtTime(volume, start);
+      gain.gain.exponentialRampToValueAtTime(.0001, start + duration);
+      osc.start(start); osc.stop(start + duration);
     } catch {}
+  };
+
+  const feedback = type => {
+    if (persistent.settings.haptics && navigator.vibrate) {
+      const patterns = {
+        win:[30,25,45,25,70], hot:[20,18,20], miss:20, bonus:[35,20,35,20,80], power:[22,15,35]
+      };
+      navigator.vibrate(patterns[type] || 12);
+    }
+    if (type === 'win') {
+      tone(520,.08); tone(660,.08,'sine',.035,.07); tone(820,.15,'sine',.04,.14);
+    } else if (type === 'bonus') {
+      tone(440,.08); tone(660,.1,'triangle',.04,.08); tone(990,.2,'triangle',.04,.18);
+    } else if (type === 'hot') {
+      tone(310,.08,'triangle',.028);
+    } else if (type === 'power') {
+      tone(470,.07); tone(720,.12,'sine',.03,.06);
+    } else {
+      tone(165,.09,'sine',.02);
+    }
+  };
+
+  const burstConfetti = (big=false) => {
+    const count = big ? 42 : 24;
+    for (let i=0;i<count;i++) {
+      const piece = document.createElement('i');
+      piece.className = 'confetti-piece';
+      piece.style.setProperty('--h', String(Math.floor(Math.random()*360)));
+      piece.style.setProperty('--x', `${Math.round((Math.random()-.5)*(big?780:520))}px`);
+      piece.style.setProperty('--r', `${Math.round((Math.random()-.5)*900)}deg`);
+      piece.style.setProperty('--d', `${(1 + Math.random()*.7).toFixed(2)}s`);
+      piece.style.left = `${35 + Math.random()*30}%`;
+      els.confetti.appendChild(piece);
+      setTimeout(() => piece.remove(), 1900);
+    }
+    els.gameCard.classList.remove('win-flash');
+    void els.gameCard.offsetWidth;
+    els.gameCard.classList.add('win-flash');
   };
 
   const applyTheme = () => {
@@ -172,63 +188,73 @@
     if (theme === 'system') theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     document.documentElement.dataset.theme = theme;
     els.themeToggle.textContent = theme === 'dark' ? '☀' : '☾';
-    const themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.setAttribute('content', theme === 'dark' ? '#07111f' : '#eff5f1');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#07111f' : '#eff5f1');
   };
 
-  const getModeConfig = () => MODES[session.mode] || MODES.classic;
-
-  const newSession = (mode = 'classic') => {
-    stopTimer();
+  const makeSession = mode => {
     const config = MODES[mode];
     const dailyRecord = persistent.daily[todayKey()];
-    session = {
+    return {
       mode,
-      level: 1,
-      max: config.startMax,
-      target: mode === 'daily' ? seededDailyTarget(todayKey()) : randomTarget(config.startMax),
-      score: 0,
-      attempts: 0,
-      roundAttempts: 0,
-      hintsLeft: config.hints,
-      lives: config.lives || 0,
-      startedAt: 0,
-      roundStartedAt: Date.now(),
-      timeRemaining: config.seconds || 0,
-      completed: false,
-      runFinished: false,
-      guesses: [],
-      dailyLocked: mode === 'daily' && !!dailyRecord?.completed
+      level:1,
+      max:config.startMax,
+      target:mode === 'daily' ? seededDailyTarget(todayKey()) : randomTarget(config.startMax),
+      score:0,
+      attempts:0,
+      roundAttempts:0,
+      hintsLeft:config.hints,
+      lives:config.lives || 0,
+      startedAt:0,
+      roundStartedAt:Date.now(),
+      timeRemaining:config.seconds || 0,
+      completed:false,
+      runFinished:false,
+      guesses:[],
+      combo:0,
+      challengeClaimed:false,
+      bonusRound:false,
+      doubleNext:false,
+      powerups:{ scan:false, double:false, lucky:false },
+      dailyLocked:mode === 'daily' && !!dailyRecord?.completed,
+      duel:mode === 'duel' ? { round:1, scores:[0,0], current:0, starter:0, goal:3 } : null
     };
+  };
+
+  const newSession = (mode='classic') => {
+    stopTimer();
+    session = makeSession(mode);
+    session.bonusRound = isJackpotLevel();
     setActiveMode(mode);
+    resetSignal();
     renderAll();
+
     if (session.dailyLocked) {
-      const won = dailyRecord.won;
-      showSignal(won ? 'Daily complete' : 'Daily finished', won ? 'You already solved today’s challenge.' : `Today’s answer was ${dailyRecord.target}.`, won ? '✓' : '•', 100);
+      const record = persistent.daily[todayKey()];
+      showSignal(record.won ? 'Daily complete' : 'Daily finished',
+        record.won ? `Solved in ${record.attempts} guesses.` : `Today’s answer was ${record.target}.`,
+        record.won ? '✓' : '•', record.won ? 100 : 0);
       lockRound();
     } else {
-      els.input.focus({ preventScroll: true });
+      els.input.focus({ preventScroll:true });
     }
   };
 
-  const randomTarget = max => Math.floor(Math.random() * max) + 1;
-
-  const setActiveMode = mode => {
+  const setActiveMode = mode =>
     document.querySelectorAll('.mode-card').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
-  };
 
   const startClockIfNeeded = () => {
     const config = getModeConfig();
     if (session.startedAt) return;
     session.startedAt = Date.now();
     session.roundStartedAt = Date.now();
+
     if (config.timed) {
       timerId = setInterval(() => {
         session.timeRemaining -= 1;
         if (session.timeRemaining <= 0) {
           session.timeRemaining = 0;
           renderMetrics();
-          finishRun(false, `Time. Final score: ${session.score}.`);
+          finishRun(false, `Time! You banked ${session.score.toLocaleString()} points.`);
           return;
         }
         renderMetrics();
@@ -248,8 +274,9 @@
   const submitGuess = raw => {
     if (session.completed || session.runFinished || session.dailyLocked) return;
     const guess = Number(raw);
+
     if (!Number.isInteger(guess) || guess < 1 || guess > session.max) {
-      toast(`Enter a whole number from 1 to ${session.max}.`);
+      toast(`Enter a whole number from 1 to ${session.max.toLocaleString()}.`);
       return;
     }
 
@@ -260,68 +287,127 @@
 
     const delta = guess - session.target;
     const distance = Math.abs(delta);
-    const closeness = Math.max(0, 100 - (distance / session.max) * 180);
+    const closeness = Math.max(0, 100 - (distance / session.max) * 190);
     const direction = delta === 0 ? 'correct' : delta > 0 ? 'lower' : 'higher';
-    session.guesses.unshift({ value: guess, direction, distance, closeness });
-    session.guesses = session.guesses.slice(0, 8);
 
-    if (delta === 0) {
-      handleWin(closeness);
+    session.guesses.unshift({
+      value:guess, direction, distance, closeness,
+      player:session.mode === 'duel' ? session.duel.current + 1 : null
+    });
+    session.guesses = session.guesses.slice(0, 9);
+
+    if (session.mode === 'duel') {
+      handleDuelGuess(guess, delta, distance, closeness, direction);
+    } else if (delta === 0) {
+      handleSoloWin();
     } else {
-      feedback('miss');
-      const descriptor = closeness >= 75 ? 'Burning hot' : closeness >= 48 ? 'Warm' : closeness >= 24 ? 'Cool' : 'Cold';
-      showSignal(direction === 'higher' ? 'Go higher' : 'Go lower', `${descriptor}. ${guess} is ${direction === 'higher' ? 'below' : 'above'} the target.`, direction === 'higher' ? '↑' : '↓', closeness);
-
-      if (session.mode === 'survival' && session.roundAttempts % 4 === 0) {
-        session.lives -= 1;
-        if (session.lives <= 0) {
-          finishRun(false, `Run over. The number was ${session.target}.`);
-        } else {
-          toast(`Life lost. ${session.lives} ${session.lives === 1 ? 'life' : 'lives'} left.`);
-        }
-      }
-
-      if (session.mode === 'daily' && session.roundAttempts >= MODES.daily.dailyAttempts) {
-        persistent.daily[todayKey()] = { completed: true, won: false, target: session.target, attempts: session.roundAttempts, date: todayKey() };
-        persistent.stats.dailyCompleted += 1;
-        finishRun(false, `Daily finished. The number was ${session.target}.`);
-      }
+      handleSoloMiss(guess, distance, closeness, direction);
     }
 
     save();
     evaluateAchievements();
     renderAll();
     els.input.value = '';
-    if (!session.completed && !session.runFinished) els.input.focus({ preventScroll: true });
+    if (!session.completed && !session.runFinished && !session.dailyLocked) els.input.focus({ preventScroll:true });
   };
 
-  const handleWin = () => {
-    feedback('win');
+  const heatLabel = closeness => closeness >= 82 ? 'BURNING' : closeness >= 58 ? 'HOT' : closeness >= 32 ? 'WARM' : 'COLD';
+
+  const pulseHeat = (closeness, oneAway=false) => {
+    els.signalCard.classList.remove('hot-pulse','one-away');
+    void els.signalCard.offsetWidth;
+    if (closeness >= 58) els.signalCard.classList.add('hot-pulse');
+    if (oneAway) els.signalCard.classList.add('one-away');
+    setTimeout(() => els.signalCard.classList.remove('hot-pulse','one-away'), 700);
+  };
+
+  const handleSoloMiss = (guess, distance, closeness, direction) => {
+    const oneAway = distance === 1;
+    feedback(closeness >= 58 ? 'hot' : 'miss');
+    pulseHeat(closeness, oneAway);
+
+    const headline = oneAway ? 'ONE AWAY!' : direction === 'higher' ? 'Go higher' : 'Go lower';
+    const copy = oneAway
+      ? `${guess} missed by one. You are sitting on the answer.`
+      : `${heatLabel(closeness)}. ${guess} is ${direction === 'higher' ? 'below' : 'above'} the target.`;
+    showSignal(headline, copy, direction === 'higher' ? '↑' : '↓', closeness);
+
+    if (session.mode === 'survival' && session.roundAttempts % 4 === 0) {
+      session.lives -= 1;
+      if (session.lives <= 0) {
+        finishRun(false, `Knocked out. The number was ${session.target}.`);
+      } else {
+        toast(`💔 Life lost — ${session.lives} left.`);
+      }
+    }
+
+    if (session.mode === 'daily' && session.roundAttempts >= MODES.daily.dailyAttempts) {
+      persistent.daily[todayKey()] = {
+        completed:true, won:false, target:session.target, attempts:session.roundAttempts, date:todayKey()
+      };
+      persistent.stats.dailyCompleted += 1;
+      finishRun(false, `Daily finished. The number was ${session.target}.`);
+    }
+  };
+
+  const handleSoloWin = () => {
     const elapsed = roundElapsed();
-    const base = Math.max(30, 145 - session.roundAttempts * 9);
+    const quickWin = session.roundAttempts <= 4;
+    session.combo = quickWin ? session.combo + 1 : 0;
+    const multiplier = comboMultiplier(session.combo);
+    const jackpot = session.bonusRound ? 2 : 1;
+    const power = session.doubleNext ? 2 : 1;
+
+    const base = Math.max(35, 150 - session.roundAttempts * 9);
     const levelBonus = session.level * 12;
-    const speedBonus = Math.max(0, 40 - Math.floor(elapsed / 1000));
-    const gain = base + levelBonus + speedBonus;
+    const speedBonus = Math.max(0, 45 - Math.floor(elapsed / 1000));
+    let gain = Math.round((base + levelBonus + speedBonus) * multiplier * jackpot * power);
+
+    if (session.combo >= 3 && !session.challengeClaimed) {
+      gain += 100;
+      session.challengeClaimed = true;
+      toast('🔥 HEAT CHECK CLEARED +100');
+    }
+
     session.score += gain;
     session.completed = true;
 
     persistent.stats.wins += 1;
     persistent.stats.currentStreak += 1;
     persistent.stats.bestStreak = Math.max(persistent.stats.bestStreak, persistent.stats.currentStreak);
+    persistent.stats.bestCombo = Math.max(persistent.stats.bestCombo, session.combo);
     persistent.stats.fastestWinMs = persistent.stats.fastestWinMs === 0 ? elapsed : Math.min(persistent.stats.fastestWinMs, elapsed);
     persistent.stats.bestAttempts = persistent.stats.bestAttempts === 0 ? session.roundAttempts : Math.min(persistent.stats.bestAttempts, session.roundAttempts);
+    persistent.stats.bestScore = Math.max(persistent.stats.bestScore, session.score);
 
-    showSignal('Correct', `That was it. +${gain} points.`, '✓', 100);
+    if (session.roundAttempts === 1) persistent.stats.perfectWins += 1;
+    if (session.bonusRound) persistent.stats.bonusWins += 1;
+
+    const perfect = session.roundAttempts === 1;
+    const clutch = (session.mode === 'daily' && session.roundAttempts === MODES.daily.dailyAttempts) ||
+      (session.mode === 'survival' && session.lives === 1);
+
+    const label = perfect ? 'CALLED IT!' : session.bonusRound ? 'JACKPOT!' : clutch ? 'CLUTCH!' : 'Correct';
+    const extra = session.doubleNext ? ' · DOUBLE UP CASHED' : '';
+    showSignal(label, `+${gain.toLocaleString()} points · ${multiplier.toFixed(2)}x combo${extra}`, perfect ? '1' : '✓', 100);
+
+    feedback(session.bonusRound || perfect ? 'bonus' : 'win');
+    burstConfetti(session.bonusRound || perfect);
+    session.doubleNext = false;
 
     if (session.mode === 'daily') {
-      persistent.daily[todayKey()] = { completed: true, won: true, target: session.target, attempts: session.roundAttempts, date: todayKey() };
+      persistent.daily[todayKey()] = {
+        completed:true, won:true, target:session.target, attempts:session.roundAttempts, date:todayKey()
+      };
       persistent.stats.dailyCompleted += 1;
       finishRun(true, `Daily solved in ${session.roundAttempts} ${session.roundAttempts === 1 ? 'guess' : 'guesses'}.`);
       return;
     }
 
     if (session.mode === 'sprint') {
-      setTimeout(() => nextRound(), 650);
+      setTimeout(() => {
+        if (!session.runFinished) nextRound();
+      }, 560);
     } else {
       els.resultActions.classList.remove('hidden');
     }
@@ -330,20 +416,104 @@
     evaluateAchievements();
   };
 
+  const handleDuelGuess = (guess, delta, distance, closeness, direction) => {
+    const duel = session.duel;
+    const player = duel.current;
+
+    if (delta === 0) {
+      duel.scores[player] += 1;
+      session.completed = true;
+      showSignal(`PLAYER ${player + 1} TAKES THE ROUND!`, `${guess} was the target. Score: ${duel.scores[0]}–${duel.scores[1]}.`, '⚔', 100);
+      feedback('bonus');
+      burstConfetti(duel.scores[player] >= duel.goal);
+
+      if (duel.scores[player] >= duel.goal) {
+        finishDuel(player);
+      } else {
+        els.resultActions.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const oneAway = distance === 1;
+    feedback(closeness >= 58 ? 'hot' : 'miss');
+    pulseHeat(closeness, oneAway);
+    duel.current = duel.current === 0 ? 1 : 0;
+
+    showSignal(
+      oneAway ? 'ONE AWAY!' : `${heatLabel(closeness)} · GO ${direction.toUpperCase()}`,
+      `Player ${duel.current + 1}, you’re up. Use the last clue.`,
+      direction === 'higher' ? '↑' : '↓',
+      closeness
+    );
+  };
+
+  const finishDuel = winner => {
+    session.runFinished = true;
+    stopTimer();
+    persistent.stats.gamesPlayed += 1;
+    persistent.stats.duelMatches += 1;
+    persistent.history.unshift({
+      date:new Date().toISOString(), mode:'duel', score:`${session.duel.scores[0]}-${session.duel.scores[1]}`,
+      level:session.duel.round, attempts:session.attempts, won:true, winner:winner + 1
+    });
+    persistent.history = persistent.history.slice(0,20);
+    showSignal('MATCH OVER', `🏆 Player ${winner + 1} wins ${session.duel.scores[0]}–${session.duel.scores[1]}!`, '🏆', 100);
+    els.resultActions.classList.remove('hidden');
+    els.nextButton.textContent = 'Run it back';
+    save();
+    evaluateAchievements();
+  };
+
   const nextRound = () => {
-    if (session.runFinished) return;
+    if (session.mode === 'duel') {
+      if (session.runFinished) {
+        newSession('duel');
+        return;
+      }
+      const duel = session.duel;
+      duel.round += 1;
+      duel.starter = duel.starter === 0 ? 1 : 0;
+      duel.current = duel.starter;
+      session.level = duel.round;
+      session.max = Math.min(250, 50 + (duel.round - 1) * 20);
+      session.target = randomTarget(session.max);
+      session.roundAttempts = 0;
+      session.guesses = [];
+      session.completed = false;
+      session.roundStartedAt = Date.now();
+      els.resultActions.classList.add('hidden');
+      resetSignal();
+      renderAll();
+      els.input.focus({ preventScroll:true });
+      return;
+    }
+
+    if (session.runFinished) {
+      newSession(session.mode);
+      return;
+    }
+
     session.completed = false;
     session.level += 1;
     session.roundAttempts = 0;
     session.guesses = [];
     session.hintsLeft = getModeConfig().hints;
-    session.max = Math.min(100000, Math.ceil(session.max * (session.mode === 'classic' ? 1.6 : session.mode === 'endless' ? 1.8 : 1.35)));
+    session.max = Math.min(100000, Math.ceil(session.max * (session.mode === 'classic' ? 1.55 : session.mode === 'endless' ? 1.78 : 1.35)));
     session.target = randomTarget(session.max);
     session.roundStartedAt = Date.now();
+    session.bonusRound = isJackpotLevel();
     els.resultActions.classList.add('hidden');
-    showSignal('New target', 'The signal reset. Read it again.', '?', 0);
+
+    if (session.bonusRound) {
+      showSignal('★ JACKPOT ROUND', 'Find this target and the round pays DOUBLE.', '×2', 0);
+      feedback('power');
+    } else {
+      resetSignal();
+    }
+
     renderAll();
-    els.input.focus({ preventScroll: true });
+    els.input.focus({ preventScroll:true });
   };
 
   const finishRun = (won, message) => {
@@ -351,22 +521,19 @@
     session.runFinished = true;
     session.completed = true;
     stopTimer();
+
     persistent.stats.gamesPlayed += 1;
-    if (!won && session.mode !== 'sprint' && session.mode !== 'daily') persistent.stats.currentStreak = 0;
+    if (!won && !['sprint','daily'].includes(session.mode)) persistent.stats.currentStreak = 0;
     persistent.stats.bestScore = Math.max(persistent.stats.bestScore, session.score);
 
     persistent.history.unshift({
-      date: new Date().toISOString(),
-      mode: session.mode,
-      score: session.score,
-      level: session.level,
-      attempts: session.attempts,
-      won
+      date:new Date().toISOString(), mode:session.mode, score:session.score,
+      level:session.level, attempts:session.attempts, won
     });
-    persistent.history = persistent.history.slice(0, 20);
+    persistent.history = persistent.history.slice(0,20);
+
     save();
     evaluateAchievements();
-
     showSignal(won ? 'Run complete' : 'Game over', message, won ? '✓' : '×', won ? 100 : 0);
     els.resultActions.classList.remove('hidden');
     els.nextButton.textContent = 'Play again';
@@ -374,37 +541,95 @@
   };
 
   const endCurrentRunForRestart = () => {
-    if (session.startedAt && !session.runFinished && session.mode !== 'daily') {
+    if (!session.startedAt || session.runFinished || session.mode === 'daily') return;
+
+    if (session.mode === 'duel') {
+      persistent.stats.gamesPlayed += 1;
+      persistent.history.unshift({
+        date:new Date().toISOString(), mode:'duel', score:`${session.duel.scores[0]}-${session.duel.scores[1]}`,
+        level:session.duel.round, attempts:session.attempts, won:false
+      });
+    } else {
       persistent.stats.gamesPlayed += 1;
       persistent.stats.currentStreak = 0;
       persistent.stats.bestScore = Math.max(persistent.stats.bestScore, session.score);
       persistent.history.unshift({
-        date: new Date().toISOString(),
-        mode: session.mode,
-        score: session.score,
-        level: session.level,
-        attempts: session.attempts,
-        won: false
+        date:new Date().toISOString(), mode:session.mode, score:session.score,
+        level:session.level, attempts:session.attempts, won:false
       });
-      persistent.history = persistent.history.slice(0, 20);
-      save();
     }
+
+    persistent.history = persistent.history.slice(0,20);
+    save();
   };
 
   const useHint = () => {
-    if (session.completed || session.runFinished || session.dailyLocked) return;
-    if (session.hintsLeft <= 0) {
-      toast('No hints left this round.');
-      return;
-    }
+    if (session.completed || session.runFinished || session.dailyLocked || ['daily','duel'].includes(session.mode)) return;
+    if (session.hintsLeft <= 0) return toast('No hints left this round.');
+
     startClockIfNeeded();
     session.hintsLeft -= 1;
     const spread = Math.max(2, Math.ceil(session.max * .12));
     const low = Math.max(1, session.target - spread);
     const high = Math.min(session.max, session.target + spread);
-    showSignal('Hint', `The target sits between ${low} and ${high}.`, '≈', 55);
-    feedback('hint');
+    showSignal('Hint used', `The target sits between ${low} and ${high}.`, '≈', 55);
+    feedback('power');
     renderMetrics();
+  };
+
+  const usePower = type => {
+    if (session.completed || session.runFinished || ['daily','duel'].includes(session.mode)) return;
+    if (session.powerups[type]) return toast('That power-up is already spent.');
+
+    startClockIfNeeded();
+    session.powerups[type] = true;
+    feedback('power');
+
+    if (type === 'scan') {
+      const spread = Math.max(2, Math.ceil(session.max * .08));
+      const low = Math.max(1, session.target - spread);
+      const high = Math.min(session.max, session.target + spread);
+      showSignal('⌖ SCANNER LOCKED', `Target detected somewhere from ${low} to ${high}.`, '⌖', 64);
+    }
+
+    if (type === 'double') {
+      session.doubleNext = true;
+      showSignal('×2 ARMED', 'Your next correct hit pays double. Misses do not waste it.', '×2', 70);
+    }
+
+    if (type === 'lucky') {
+      if (session.mode === 'sprint') {
+        session.timeRemaining += 12;
+        toast('🍀 Lucky Break: +12 seconds');
+        showSignal('TIME WARP', '+12 seconds added to the clock.', '+12', 72);
+      } else if (session.mode === 'survival') {
+        session.lives += 1;
+        toast('🍀 Lucky Break: +1 life');
+        showSignal('EXTRA LIFE', 'You just stole one more life.', '♥', 72);
+      } else {
+        const roll = Math.floor(Math.random() * 3);
+        if (roll === 0) {
+          session.score += 75;
+          toast('🍀 Lucky Break: +75 points');
+          showSignal('FREE MONEY', '+75 points, no questions asked.', '+75', 72);
+        } else if (roll === 1) {
+          session.hintsLeft += 1;
+          toast('🍀 Lucky Break: +1 hint');
+          showSignal('EXTRA HINT', 'One extra hint has been loaded.', '+1', 72);
+        } else {
+          const parity = session.target % 2 === 0 ? 'EVEN' : 'ODD';
+          toast(`🍀 Lucky Break: target is ${parity}`);
+          showSignal('PARITY REVEAL', `The target is an ${parity} number.`, parity, 72);
+        }
+      }
+    }
+
+    renderAll();
+  };
+
+  const resetSignal = () => {
+    const duelText = session.mode === 'duel' ? 'Player 1 starts. Every miss passes the phone.' : 'The target is waiting.';
+    showSignal('Make your first guess', duelText, '?', 0);
   };
 
   const showSignal = (label, text, orb, meter) => {
@@ -415,15 +640,12 @@
   };
 
   const lockRound = () => {
-    els.input.disabled = true;
-    els.guessButton.disabled = true;
-    els.hintButton.disabled = true;
+    els.input.disabled = true; els.guessButton.disabled = true; els.hintButton.disabled = true;
   };
 
   const unlockRound = () => {
-    els.input.disabled = false;
-    els.guessButton.disabled = false;
-    els.hintButton.disabled = false;
+    els.input.disabled = false; els.guessButton.disabled = false;
+    els.hintButton.disabled = ['daily','duel'].includes(session.mode);
   };
 
   const renderAll = () => {
@@ -432,28 +654,56 @@
     renderGuessHistory();
     renderPersistent();
     renderDaily();
+    renderChallenge();
+    renderPowerDeck();
+    renderDuel();
   };
 
   const renderGame = () => {
     const config = getModeConfig();
     els.modeKicker.textContent = `${config.label.toUpperCase()} MODE`;
-    els.modeTitle.textContent = session.mode === 'daily' ? 'Today’s puzzle' : `Level ${session.level}`;
+    els.modeTitle.textContent =
+      session.mode === 'daily' ? 'Today’s puzzle' :
+      session.mode === 'duel' ? `Round ${session.duel.round}` :
+      `Level ${session.level}`;
     els.modeDescription.textContent = config.subtitle;
     els.rangePill.textContent = `1–${session.max.toLocaleString()}`;
     els.rangeCopy.textContent = `Choose a number from 1 to ${session.max.toLocaleString()}.`;
-    els.input.min = '1';
-    els.input.max = String(session.max);
+    els.input.min = '1'; els.input.max = String(session.max);
     els.hintsLeft.textContent = `(${session.hintsLeft})`;
+
+    els.comboValue.textContent = `x${comboMultiplier(session.combo).toFixed(2)}`;
+    els.comboPill.classList.toggle('hidden', ['daily','duel'].includes(session.mode));
+    els.jackpotPill.classList.toggle('hidden', !session.bonusRound || session.completed);
+
+    els.guessLabel.textContent = session.mode === 'duel' ? `Player ${session.duel.current + 1} guess` : 'Your guess';
 
     if (!session.completed && !session.runFinished && !session.dailyLocked) unlockRound();
     else lockRound();
 
-    els.nextButton.textContent = session.runFinished ? 'Play again' : 'Next round';
+    els.nextButton.textContent =
+      session.mode === 'duel' && session.runFinished ? 'Run it back' :
+      session.runFinished ? 'Play again' : 'Next round';
+
     if (!session.completed) els.resultActions.classList.add('hidden');
   };
 
   const renderMetrics = () => {
+    if (session.mode === 'duel') {
+      els.metricOneLabel.textContent = 'Round';
+      els.score.textContent = session.duel.round;
+      els.metricTwoLabel.textContent = 'Total guesses';
+      els.attempts.textContent = session.attempts;
+      els.timerLabel.textContent = 'Turn';
+      els.timer.textContent = `P${session.duel.current + 1}`;
+      els.resourceLabel.textContent = 'Goal';
+      els.resource.textContent = '3 wins';
+      return;
+    }
+
+    els.metricOneLabel.textContent = 'Score';
     els.score.textContent = session.score.toLocaleString();
+    els.metricTwoLabel.textContent = 'Attempts';
     els.attempts.textContent = session.attempts.toLocaleString();
 
     if (session.mode === 'sprint') {
@@ -475,7 +725,7 @@
       els.resource.textContent = session.hintsLeft;
     }
 
-    els.hintButton.classList.toggle('hidden', session.mode === 'daily');
+    els.hintButton.classList.toggle('hidden', ['daily','duel'].includes(session.mode));
   };
 
   const renderGuessHistory = () => {
@@ -483,29 +733,79 @@
       els.guessHistory.innerHTML = '<li class="empty-state">Your guesses will show up here.</li>';
       return;
     }
+
     els.guessHistory.innerHTML = session.guesses.map(g => `
       <li>
         <span class="guess-number">${g.value}</span>
-        <span class="guess-direction">${g.direction === 'correct' ? 'Target found' : `Go ${g.direction}`}</span>
-        <span class="guess-distance">${g.direction === 'correct' ? 'hit' : g.closeness >= 70 ? 'hot' : g.closeness >= 40 ? 'warm' : 'cold'}</span>
+        <span class="guess-direction">${g.player ? `P${g.player} · ` : ''}${g.direction === 'correct' ? 'Target found' : `Go ${g.direction}`}</span>
+        <span class="guess-distance">${g.direction === 'correct' ? 'hit' : g.distance === 1 ? '1 away' : g.closeness >= 70 ? 'hot' : g.closeness >= 40 ? 'warm' : 'cold'}</span>
       </li>
     `).join('');
   };
 
   const renderPersistent = () => {
     els.heroBestScore.textContent = persistent.stats.bestScore.toLocaleString();
-    els.heroStreak.textContent = persistent.stats.currentStreak;
+    els.heroCombo.textContent = persistent.stats.bestCombo;
     els.heroGames.textContent = persistent.stats.gamesPlayed;
     renderAchievements();
   };
 
   const renderDaily = () => {
-    const key = todayKey();
-    const record = persistent.daily[key];
-    els.dailyDate.textContent = new Date().toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+    const record = persistent.daily[todayKey()];
+    els.dailyDate.textContent = new Date().toLocaleDateString(undefined,{ weekday:'short', month:'short', day:'numeric' });
     els.dailyStatus.textContent = record?.completed ? (record.won ? 'Solved' : 'Finished') : 'Ready';
     els.dailyStatus.classList.toggle('done', !!record?.completed);
     els.playDailyButton.textContent = record?.completed ? 'View daily' : 'Play daily';
+  };
+
+  const renderChallenge = () => {
+    if (session.mode === 'duel') {
+      els.challengeTitle.textContent = 'First to Three';
+      els.challengeCopy.textContent = 'Alternate after every miss. The round winner earns one point. First player to three takes the match.';
+      els.challengeStatus.textContent = `${session.duel.scores[0]}–${session.duel.scores[1]}`;
+      els.challengeFill.style.width = `${Math.max(...session.duel.scores) / 3 * 100}%`;
+      return;
+    }
+
+    if (session.mode === 'daily') {
+      els.challengeTitle.textContent = 'Seven Shot';
+      els.challengeCopy.textContent = 'Daily mode stays pure: no power-ups, one target, seven attempts.';
+      els.challengeStatus.textContent = `${Math.min(session.roundAttempts,7)}/7`;
+      els.challengeFill.style.width = `${Math.min(session.roundAttempts,7) / 7 * 100}%`;
+      return;
+    }
+
+    els.challengeTitle.textContent = session.challengeClaimed ? 'Heat Check Cleared' : 'Heat Check';
+    els.challengeCopy.textContent = session.challengeClaimed
+      ? 'You hit a 3-round quick-win combo and banked the +100 challenge bonus.'
+      : 'Win three rounds in four guesses or fewer to bank +100 bonus points.';
+    const progress = session.challengeClaimed ? 3 : Math.min(session.combo,3);
+    els.challengeStatus.textContent = `${progress}/3`;
+    els.challengeFill.style.width = `${progress / 3 * 100}%`;
+  };
+
+  const renderPowerDeck = () => {
+    const disabledMode = ['daily','duel'].includes(session.mode);
+    els.powerDeck.classList.toggle('hidden', disabledMode);
+
+    for (const [type, button] of [['scan',els.powerScan],['double',els.powerDouble],['lucky',els.powerLucky]]) {
+      const used = !!session.powerups?.[type];
+      button.disabled = used || disabledMode || session.completed || session.runFinished;
+      button.classList.toggle('used', used);
+      button.classList.toggle('armed', type === 'double' && session.doubleNext);
+    }
+  };
+
+  const renderDuel = () => {
+    const active = session.mode === 'duel';
+    els.duelBoard.classList.toggle('hidden', !active);
+    if (!active) return;
+
+    els.duelScore1.textContent = session.duel.scores[0];
+    els.duelScore2.textContent = session.duel.scores[1];
+    els.duelRound.textContent = session.duel.round;
+    els.duelP1.classList.toggle('active', session.duel.current === 0 && !session.completed);
+    els.duelP2.classList.toggle('active', session.duel.current === 1 && !session.completed);
   };
 
   const renderAchievements = () => {
@@ -524,7 +824,7 @@
       if (!persistent.unlocked.includes(achievement.id) && achievement.test(persistent.stats)) {
         persistent.unlocked.push(achievement.id);
         changed = true;
-        toast(`Achievement unlocked: ${achievement.name}`);
+        toast(`🏆 Achievement: ${achievement.name}`);
       }
     }
     if (changed) save();
@@ -534,23 +834,18 @@
     const s = persistent.stats;
     const accuracy = s.totalGuesses ? Math.round((s.wins / s.totalGuesses) * 100) : 0;
     const items = [
-      ['Games', s.gamesPlayed],
-      ['Wins', s.wins],
-      ['Best score', s.bestScore.toLocaleString()],
-      ['Best streak', s.bestStreak],
-      ['Best guesses', s.bestAttempts || '—'],
-      ['Fastest round', formatTime(s.fastestWinMs)],
-      ['Total guesses', s.totalGuesses.toLocaleString()],
-      ['Win/guess rate', `${accuracy}%`],
-      ['Daily clears', s.dailyCompleted]
+      ['Games',s.gamesPlayed], ['Solo wins',s.wins], ['Best score',s.bestScore.toLocaleString()],
+      ['Best combo',s.bestCombo], ['Best streak',s.bestStreak], ['Best guesses',s.bestAttempts || '—'],
+      ['Fastest round',formatTime(s.fastestWinMs)], ['Perfect hits',s.perfectWins], ['Duel matches',s.duelMatches],
+      ['Total guesses',s.totalGuesses.toLocaleString()], ['Win/guess rate',`${accuracy}%`], ['Daily clears',s.dailyCompleted]
     ];
     els.statsGrid.innerHTML = items.map(([label,value]) => `<div class="stat-tile"><span>${label}</span><strong>${value}</strong></div>`).join('');
 
     els.gameHistory.innerHTML = persistent.history.length
       ? persistent.history.slice(0,8).map(item => `
         <div class="game-history-row">
-          <strong>${MODES[item.mode]?.label || item.mode} · ${item.score} pts</strong>
-          <span>${new Date(item.date).toLocaleDateString()} · L${item.level}</span>
+          <strong>${MODES[item.mode]?.label || item.mode} · ${item.mode === 'duel' ? item.score : `${Number(item.score || 0).toLocaleString()} pts`}</strong>
+          <span>${new Date(item.date).toLocaleDateString()}${item.winner ? ` · P${item.winner} won` : ` · L${item.level}`}</span>
         </div>
       `).join('')
       : '<p class="empty-state">No completed runs yet.</p>';
@@ -567,7 +862,10 @@
   const shareResult = async () => {
     const text = session.mode === 'daily'
       ? `Guess Arcade Daily ${todayKey()} — ${session.roundAttempts}/${MODES.daily.dailyAttempts} guesses.`
-      : `Guess Arcade ${MODES[session.mode].label} — ${session.score} points, level ${session.level}.`;
+      : session.mode === 'duel'
+        ? `Guess Arcade Duel — Player ${session.duel.scores[0] > session.duel.scores[1] ? 1 : 2} won ${session.duel.scores[0]}–${session.duel.scores[1]}.`
+        : `Guess Arcade ${MODES[session.mode].label} — ${session.score} points, level ${session.level}, ${session.combo} combo.`;
+
     try {
       if (navigator.share) await navigator.share({ title:'Guess Arcade', text });
       else {
@@ -578,13 +876,11 @@
   };
 
   const exportData = () => {
-    const blob = new Blob([JSON.stringify(persistent, null, 2)], { type:'application/json' });
+    const blob = new Blob([JSON.stringify(persistent,null,2)],{ type:'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `guess-arcade-backup-${todayKey()}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 500);
+    a.href = url; a.download = `guess-arcade-backup-${todayKey()}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url),500);
   };
 
   const importData = async file => {
@@ -594,18 +890,14 @@
       if (!parsed || typeof parsed !== 'object' || !parsed.stats || !parsed.settings) throw new Error('invalid');
       const base = defaultState();
       persistent = {
-        ...base,
-        ...parsed,
-        stats: { ...base.stats, ...parsed.stats },
-        settings: { ...base.settings, ...parsed.settings },
-        history: Array.isArray(parsed.history) ? parsed.history.slice(0,20) : [],
-        unlocked: Array.isArray(parsed.unlocked) ? parsed.unlocked.filter(id => ACHIEVEMENTS.some(a => a.id === id)) : [],
-        daily: parsed.daily && typeof parsed.daily === 'object' ? parsed.daily : {}
+        ...base, ...parsed,
+        stats:{ ...base.stats, ...parsed.stats },
+        settings:{ ...base.settings, ...parsed.settings },
+        history:Array.isArray(parsed.history) ? parsed.history.slice(0,20) : [],
+        unlocked:Array.isArray(parsed.unlocked) ? parsed.unlocked.filter(id => ACHIEVEMENTS.some(a => a.id === id)) : [],
+        daily:parsed.daily && typeof parsed.daily === 'object' ? parsed.daily : {}
       };
-      save();
-      applyTheme();
-      newSession(session.mode || 'classic');
-      toast('Backup imported.');
+      save(); applyTheme(); newSession(session.mode || 'classic'); toast('Backup imported.');
     } catch {
       toast('That backup file could not be imported.');
     } finally {
@@ -614,74 +906,45 @@
   };
 
   const resetData = () => {
-    const okay = confirm('Reset all local stats, achievements, settings, and daily history?');
-    if (!okay) return;
-    persistent = defaultState();
-    save();
-    applyTheme();
-    newSession('classic');
-    els.settingsDialog.close();
-    toast('Local data reset.');
+    if (!confirm('Reset all local stats, achievements, settings, and daily history?')) return;
+    persistent = defaultState(); save(); applyTheme(); newSession('classic'); els.settingsDialog.close(); toast('Local data reset.');
   };
 
-  els.form.addEventListener('submit', event => {
-    event.preventDefault();
-    submitGuess(els.input.value);
-  });
+  els.form.addEventListener('submit', event => { event.preventDefault(); submitGuess(els.input.value); });
 
   document.querySelectorAll('.mode-card').forEach(button => {
     button.addEventListener('click', () => {
+      if (button.dataset.mode === session.mode && !session.runFinished && !session.dailyLocked) return;
       endCurrentRunForRestart();
       newSession(button.dataset.mode);
     });
   });
 
-  els.hintButton.addEventListener('click', useHint);
-  els.nextButton.addEventListener('click', () => {
-    if (session.runFinished) newSession(session.mode);
-    else nextRound();
-  });
-  els.shareButton.addEventListener('click', shareResult);
-  els.newGameButton.addEventListener('click', () => {
-    endCurrentRunForRestart();
-    newSession(session.mode);
-  });
-  els.playDailyButton.addEventListener('click', () => {
-    endCurrentRunForRestart();
-    newSession('daily');
-  });
+  document.querySelectorAll('[data-power]').forEach(button =>
+    button.addEventListener('click', () => usePower(button.dataset.power)));
 
+  els.hintButton.addEventListener('click', useHint);
+  els.nextButton.addEventListener('click', nextRound);
+  els.shareButton.addEventListener('click', shareResult);
+  els.newGameButton.addEventListener('click', () => { endCurrentRunForRestart(); newSession(session.mode); });
+  els.playDailyButton.addEventListener('click', () => { endCurrentRunForRestart(); newSession('daily'); });
   $('stats-button').addEventListener('click', openStats);
   $('settings-button').addEventListener('click', openSettings);
 
   els.themeToggle.addEventListener('click', () => {
     const current = document.documentElement.dataset.theme;
     persistent.settings.theme = current === 'dark' ? 'light' : 'dark';
-    save();
-    applyTheme();
+    save(); applyTheme();
   });
-  els.themeSelect.addEventListener('change', () => {
-    persistent.settings.theme = els.themeSelect.value;
-    save();
-    applyTheme();
-  });
-  els.soundToggle.addEventListener('change', () => {
-    persistent.settings.sound = els.soundToggle.checked;
-    save();
-  });
-  els.hapticsToggle.addEventListener('change', () => {
-    persistent.settings.haptics = els.hapticsToggle.checked;
-    save();
-  });
-
+  els.themeSelect.addEventListener('change', () => { persistent.settings.theme = els.themeSelect.value; save(); applyTheme(); });
+  els.soundToggle.addEventListener('change', () => { persistent.settings.sound = els.soundToggle.checked; save(); });
+  els.hapticsToggle.addEventListener('change', () => { persistent.settings.haptics = els.hapticsToggle.checked; save(); });
   els.exportButton.addEventListener('click', exportData);
   els.importInput.addEventListener('change', () => importData(els.importInput.files?.[0]));
   els.resetDataButton.addEventListener('click', resetData);
 
   window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    els.installButton.classList.remove('hidden');
+    event.preventDefault(); deferredInstallPrompt = event; els.installButton.classList.remove('hidden');
   });
   els.installButton.addEventListener('click', async () => {
     if (!deferredInstallPrompt) return;

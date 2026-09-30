@@ -1,7 +1,7 @@
 {
   "name": "Guess Arcade",
   "short_name": "Guess Arcade",
-  "description": "A local-first number guessing arcade with multiple modes, daily challenges, achievements, and offline play.",
+  "description": "A local-first guessing arcade with six modes, two-player duels, combos, power-ups, jackpot rounds, daily challenges, and offline play.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
