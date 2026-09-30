@@ -816,6 +816,13 @@
         date:new Date().toISOString(), mode:'duel', score:`${session.duel.scores[0]}-${session.duel.scores[1]}`,
         level:session.duel.round, attempts:session.attempts, won:false
       });
+    } else if (session.mode === 'tournament') {
+      persistent.stats.gamesPlayed += 1;
+      persistent.history.unshift({
+        date:new Date().toISOString(), mode:'tournament',
+        score:session.tournament.players.map(p => `${p.name}:${p.score}`).join(', '),
+        level:Math.min(session.tournament.round,session.tournament.rounds), attempts:session.attempts, won:false
+      });
     } else {
       persistent.stats.gamesPlayed += 1;
       persistent.stats.currentStreak = 0;
@@ -1192,8 +1199,8 @@
     els.gameHistory.innerHTML = persistent.history.length
       ? persistent.history.slice(0,8).map(item => `
         <div class="game-history-row">
-          <strong>${MODES[item.mode]?.label || item.mode} · ${item.mode === 'duel' ? item.score : `${Number(item.score || 0).toLocaleString()} pts`}</strong>
-          <span>${new Date(item.date).toLocaleDateString()}${item.winner ? ` · P${item.winner} won` : ` · L${item.level}`}</span>
+          <strong>${MODES[item.mode]?.label || item.mode} · ${['duel','tournament'].includes(item.mode) ? item.score : `${Number(item.score || 0).toLocaleString()} pts`}</strong>
+          <span>${new Date(item.date).toLocaleDateString()}${item.winner ? ` · ${item.mode === 'duel' ? `P${item.winner}` : item.winner} won` : ` · L${item.level}`}</span>
         </div>
       `).join('')
       : '<p class="empty-state">No completed runs yet.</p>';
@@ -1212,7 +1219,11 @@
       ? `Guess Arcade Daily ${todayKey()} — ${session.roundAttempts}/${MODES.daily.dailyAttempts} guesses.`
       : session.mode === 'duel'
         ? `Guess Arcade Duel — Player ${session.duel.scores[0] > session.duel.scores[1] ? 1 : 2} won ${session.duel.scores[0]}–${session.duel.scores[1]}.`
-        : `Guess Arcade ${MODES[session.mode].label} — ${session.score} points, level ${session.level}, ${session.combo} combo.`;
+        : session.mode === 'tournament'
+          ? `Guess Arcade Tournament — ${session.tournament.players.map(p => `${p.name} ${p.score}`).join(' · ')}.`
+          : session.mode === 'challenge'
+            ? `Guess Arcade Challenge ${session.challengeData.code} — ${session.roundAttempts}/${session.attemptLimit} guesses.`
+            : `Guess Arcade ${MODES[session.mode].label} — ${session.score} points, level ${session.level}, ${session.combo} combo.`;
 
     try {
       if (navigator.share) await navigator.share({ title:'Guess Arcade', text });
