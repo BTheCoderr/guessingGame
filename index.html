@@ -201,10 +201,24 @@
               <span class="daily-status" id="daily-status">Ready</span>
             </div>
             <p>Same date-seeded puzzle all day. Seven guesses. No power-ups.</p>
+            <div class="daily-streak-grid">
+              <div><span>Current streak</span><strong id="daily-streak">0 days</strong></div>
+              <div><span>Best streak</span><strong id="daily-best-streak">0 days</strong></div>
+            </div>
+            <div class="streak-week" id="daily-week" aria-label="Last seven daily challenges"></div>
             <div class="daily-meta">
               <span id="daily-date"></span>
               <button class="secondary-button" id="play-daily-button" type="button">Play daily</button>
             </div>
+          </section>
+
+          <section class="panel leaderboard-panel">
+            <div class="panel-head">
+              <div><span class="eyebrow">LOCAL LEADERBOARD</span><h3>House rankings</h3></div>
+              <span class="daily-status" id="leaderboard-count">1 player</span>
+            </div>
+            <p>Saved players rank by total hits, then tournament wins and best score.</p>
+            <div class="leaderboard-list" id="leaderboard-list"></div>
           </section>
 
           <section class="panel achievements-panel">
@@ -275,8 +289,10 @@
         <div class="code-box hidden" id="generated-code-box">
           <span>Your challenge code</span>
           <strong id="generated-code"></strong>
+          <small class="challenge-link-preview" id="generated-challenge-link"></small>
           <div class="code-actions">
-            <button class="secondary-button" id="copy-challenge-button" type="button">Copy</button>
+            <button class="secondary-button" id="copy-challenge-button" type="button">Copy code</button>
+            <button class="secondary-button" id="copy-challenge-link-button" type="button">Copy link</button>
             <button class="primary-button" id="play-generated-challenge-button" type="button">Play it</button>
           </div>
         </div>
