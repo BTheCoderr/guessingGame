@@ -107,3 +107,38 @@ button:disabled{cursor:not-allowed;opacity:.45;transform:none}
   .side-stack{grid-template-columns:1fr}.achievements-panel{grid-column:auto}.stats-grid{grid-template-columns:repeat(2,1fr)}.settings-actions{display:grid}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+
+/* Party Lab final pass */
+.party-panel p,.dialog-copy{color:var(--muted);line-height:1.55;font-size:13px}
+.party-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
+.party-actions .secondary-button{padding:0 10px;font-size:11px}
+.profile-list{display:grid;gap:8px;margin:20px 0}
+.profile-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:9px;padding:11px 12px;border-radius:14px;background:var(--bg-soft);border:1px solid var(--line)}
+.profile-row.active{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:color-mix(in srgb,var(--accent) 8%,var(--bg-soft))}
+.profile-row strong,.profile-row small{display:block}.profile-row small{color:var(--muted);font-size:10px;margin-top:2px}
+.profile-chip{min-height:34px;padding:0 11px;border-radius:11px;background:var(--card-strong);border:1px solid var(--line);font-size:10px;font-weight:900}
+.profile-chip.active{color:var(--accent)}
+.inline-form{display:grid;grid-template-columns:1fr auto;gap:8px}
+.inline-form input,.builder-grid input,.join-code input{width:100%;min-width:0;min-height:48px;border-radius:13px;border:1px solid var(--line);background:var(--bg-soft);color:var(--text);padding:0 13px}
+.builder-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:20px 0}
+.builder-grid label{display:grid;gap:7px}.builder-grid label>span,.join-code>label{color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.compact-setting{padding:12px 0}.wide-button{width:100%;margin-top:12px}
+.challenge-builder{margin-top:18px}.code-box{margin:15px 0;padding:16px;border:1px solid color-mix(in srgb,var(--accent) 38%,var(--line));border-radius:16px;background:color-mix(in srgb,var(--accent) 8%,var(--bg-soft));text-align:center}
+.code-box span,.code-box strong{display:block}.code-box span{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.1em}.code-box strong{margin:8px 0;font-size:22px;letter-spacing:.06em;word-break:break-all}
+.code-actions{display:flex;justify-content:center;gap:8px}.join-code{margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}.join-code>label{display:block;margin-bottom:8px}
+.tournament-picker{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:18px 0}
+.tournament-pick{display:flex;align-items:center;gap:9px;padding:12px;border-radius:13px;background:var(--bg-soft);border:1px solid var(--line);cursor:pointer}
+.tournament-pick input{accent-color:var(--accent-strong);width:18px;height:18px}.tournament-pick span{font-size:12px;font-weight:800}
+.tournament-scoreboard{margin:22px 0 0;padding:12px;border-radius:18px;background:var(--bg-soft);border:1px solid var(--line)}
+.tournament-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.tournament-head>strong{font-size:12px}
+.tournament-players{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.tournament-player{flex:0 0 auto;min-width:105px;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--card-strong)}
+.tournament-player.active{border-color:color-mix(in srgb,var(--warning) 60%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--warning) 25%,transparent)}
+.tournament-player span,.tournament-player strong{display:block}.tournament-player span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.tournament-player strong{font-size:17px;margin-top:4px}
+@media(max-width:620px){
+  .party-actions{grid-template-columns:1fr}
+  .builder-grid,.tournament-picker{grid-template-columns:1fr}
+  .inline-form{grid-template-columns:1fr}
+  .profile-row{grid-template-columns:1fr auto}.profile-row .profile-chip:last-child{grid-column:1/-1}
+}
