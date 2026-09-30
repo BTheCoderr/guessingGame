@@ -16,8 +16,10 @@ The final expansion adds replay and social features without adding accounts or a
 
 ### Party Lab
 - **Local player profiles** — save up to six names and keep local records
+- **Local leaderboard** — rank saved players by hits, tournament wins, score, perfect guesses, and fastest solves
+- **Daily streaks** — track current/best completion streaks with a rolling seven-day view
 - **Custom games** — choose range, guess limit, timer, hints, Power Deck, and jackpot finish
-- **Challenge Codes** — compact deterministic codes recreate the same range, rules, and target on any device; no server required
+- **Challenge Codes + Links** — deterministic challenges can be copied as codes or opened directly through a shareable `?challenge=` link; no server required
 - **Tournament mode** — choose 3–6 saved players, 1–5 rounds, range, and guess limit
   - each player gets a private deterministic target at equal difficulty
   - fewer guesses earns more tournament points
