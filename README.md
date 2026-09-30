@@ -6,6 +6,23 @@
 **What it demonstrates:** JavaScript · Express · PWA/offline · local persistence · game-state design.
 <!-- repo-intro:end -->
 
+<!-- portfolio-refresh:start -->
+## Product at a glance
+
+| Area | Current build |
+| --- | --- |
+| Solo | Classic, Sprint, Survival, Endless, Daily |
+| Competitive | Two-player Duel + local 3–6 player tournaments |
+| Replayability | Deterministic challenge codes/links, achievements, streaks, local history |
+| Systems | Power-ups, combo multipliers, Jackpot, Heat Check |
+| Persistence | Local profiles, stats, settings, backup/restore |
+| Delivery | Installable offline PWA with no account/backend requirement |
+
+### Engineering angle
+
+Guess Arcade intentionally proves that a small browser game can gain deterministic challenges, tournament state, profiles, persistence, sharing, and offline support **without pretending it needs a hosted backend**. Shared challenge state is encoded into reproducible local game configuration instead.
+<!-- portfolio-refresh:end -->
+
 A local-first revival of the original Number Guessing Game, rebuilt into a browser arcade with solo, competitive, and party play.
 
 ## v4 Party Lab
