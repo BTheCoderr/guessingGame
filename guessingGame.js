@@ -1416,8 +1416,14 @@
         settings:{ ...base.settings, ...parsed.settings },
         history:Array.isArray(parsed.history) ? parsed.history.slice(0,20) : [],
         unlocked:Array.isArray(parsed.unlocked) ? parsed.unlocked.filter(id => ACHIEVEMENTS.some(a => a.id === id)) : [],
-        daily:parsed.daily && typeof parsed.daily === 'object' ? parsed.daily : {}
+        daily:parsed.daily && typeof parsed.daily === 'object' ? parsed.daily : {},
+        profiles:Array.isArray(parsed.profiles) && parsed.profiles.length
+          ? parsed.profiles.slice(0,6).map(normalizeProfile)
+          : base.profiles.map(normalizeProfile)
       };
+      if (!persistent.profiles.some(p => p.id === persistent.activeProfileId)) {
+        persistent.activeProfileId = persistent.profiles[0]?.id || 'guest';
+      }
       save(); applyTheme(); newSession(session.mode || 'classic'); toast('Backup imported.');
     } catch {
       toast('That backup file could not be imported.');
