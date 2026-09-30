@@ -1,5 +1,11 @@
 # Guess Arcade
 
+<!-- repo-intro:start -->
+**Project snapshot:** Guess Arcade is a local-first browser game suite that evolves a basic number-guessing exercise into solo, competitive, daily, challenge-link, and local tournament play.
+
+**What it demonstrates:** JavaScript · Express · PWA/offline · local persistence · game-state design.
+<!-- repo-intro:end -->
+
 A local-first revival of the original Number Guessing Game, rebuilt into a browser arcade with solo, competitive, and party play.
 
 ## v4 Party Lab
