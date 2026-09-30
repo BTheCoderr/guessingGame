@@ -353,10 +353,15 @@
     els.input.focus({preventScroll:true});
   };
 
-  const tournamentTarget = () => seededTarget(
-    session.tournament.seed + session.tournament.round * 1009 + session.tournament.current * 97,
-    session.tournament.max
-  );
+  const tournamentTarget = (previousTarget=null) => {
+    const target = seededTarget(
+      session.tournament.seed + session.tournament.round * 1009 + session.tournament.current * 97,
+      session.tournament.max
+    );
+    return session.tournament.max > 1 && target === previousTarget
+      ? (target % session.tournament.max) + 1
+      : target;
+  };
 
   const startTournament = ({profileIds, rounds, max, attempts}) => {
     const players = profileIds
@@ -367,7 +372,8 @@
     if (players.length < 3) return toast('Choose at least 3 saved players.');
 
     stopTimer();
-    session = makeSession('tournament');
+    const previousTarget = session?.target ?? null;
+    session = makeSession('tournament', previousTarget);
     session.tournament = {
       players, rounds, round:1, current:0, max, attemptLimit:attempts,
       seed:(Date.now() % 2147483647) || 1,
@@ -375,7 +381,7 @@
     };
     session.max = max;
     session.attemptLimit = attempts;
-    session.target = tournamentTarget();
+    session.target = tournamentTarget(previousTarget);
     session.allowPowers = false;
     setActiveMode('');
     resetSignal();
@@ -655,7 +661,7 @@
     session.completed = false;
     session.roundAttempts = 0;
     session.guesses = [];
-    session.target = tournamentTarget();
+    session.target = tournamentTarget(session.target);
     session.roundStartedAt = Date.now();
     els.resultActions.classList.add('hidden');
     showSignal('NEXT TURN', `${t.players[t.current].name}, you have ${t.attemptLimit} guesses.`, '♛', 0);
