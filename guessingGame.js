@@ -110,7 +110,19 @@
   };
 
   const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(persistent));
-  const randomTarget = max => Math.floor(Math.random() * max) + 1;
+  const randomTarget = (max, previousTarget=null) => {
+    const ceiling = Math.max(1, Math.floor(Number(max) || 1));
+    if (ceiling === 1) return 1;
+
+    const previous = Number(previousTarget);
+    if (!Number.isInteger(previous) || previous < 1 || previous > ceiling) {
+      return Math.floor(Math.random() * ceiling) + 1;
+    }
+
+    // Pick uniformly from every valid number except the immediately previous target.
+    const roll = Math.floor(Math.random() * (ceiling - 1)) + 1;
+    return roll >= previous ? roll + 1 : roll;
+  };
   const activeProfile = () => persistent.profiles.find(p => p.id === persistent.activeProfileId) || persistent.profiles[0];
   const normalizeProfile = p => ({
     id:p.id, name:p.name,
@@ -248,14 +260,14 @@
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#07111f' : '#eff5f1');
   };
 
-  const makeSession = mode => {
+  const makeSession = (mode, previousTarget=null) => {
     const config = MODES[mode];
     const dailyRecord = persistent.daily[todayKey()];
     return {
       mode,
       level:1,
       max:config.startMax,
-      target:mode === 'daily' ? seededDailyTarget(todayKey()) : randomTarget(config.startMax),
+      target:mode === 'daily' ? seededDailyTarget(todayKey()) : randomTarget(config.startMax, previousTarget),
       score:0,
       attempts:0,
       roundAttempts:0,
@@ -284,7 +296,8 @@
 
   const newSession = (mode='classic') => {
     stopTimer();
-    session = makeSession(mode);
+    const previousTarget = session?.target ?? null;
+    session = makeSession(mode, previousTarget);
     session.bonusRound = isJackpotLevel();
     setActiveMode(mode);
     resetSignal();
@@ -306,10 +319,11 @@
 
   const startCustom = config => {
     stopTimer();
-    session = makeSession('custom');
+    const previousTarget = session?.target ?? null;
+    session = makeSession('custom', previousTarget);
     session.custom = config;
     session.max = config.max;
-    session.target = randomTarget(config.max);
+    session.target = randomTarget(config.max, previousTarget);
     session.hintsLeft = config.hints;
     session.timeRemaining = config.seconds;
     session.attemptLimit = config.attempts;
@@ -734,7 +748,7 @@
       duel.current = duel.starter;
       session.level = duel.round;
       session.max = Math.min(250, 50 + (duel.round - 1) * 20);
-      session.target = randomTarget(session.max);
+      session.target = randomTarget(session.max, session.target);
       session.roundAttempts = 0;
       session.guesses = [];
       session.completed = false;
@@ -757,7 +771,7 @@
     session.guesses = [];
     session.hintsLeft = getModeConfig().hints;
     session.max = Math.min(100000, Math.ceil(session.max * (session.mode === 'classic' ? 1.55 : session.mode === 'endless' ? 1.78 : 1.35)));
-    session.target = randomTarget(session.max);
+    session.target = randomTarget(session.max, session.target);
     session.roundStartedAt = Date.now();
     session.bonusRound = isJackpotLevel();
     els.resultActions.classList.add('hidden');
