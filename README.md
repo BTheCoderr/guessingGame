@@ -1,44 +1,35 @@
 # Guess Arcade
 
-A local-first revival of the original Number Guessing Game, rebuilt into a small browser arcade.
+A local-first revival of the original Number Guessing Game, rebuilt into a browser arcade with solo, competitive, and party play.
 
-## v3 fun pass
+## v4 Party Lab
 
-The core higher/lower game is still the point, but it now has enough game systems around it to feel like an arcade instead of a demo.
+The final expansion adds replay and social features without adding accounts or a backend.
 
-### Six modes
+### Core arcade
+- Classic, Sprint, Survival, Endless, Daily, and two-player Duel
+- Combo multipliers, Jackpot rounds, Heat Check bonuses
+- Scanner, Double Up, and Lucky Break power-ups
+- Hot / warm / cold feedback, one-away callouts, sound, haptics, confetti
+- Achievements, local stats, history, themes, sharing, JSON backup/restore
+- Installable PWA with offline support
 
-- **Classic** — progressive levels, combos, jackpot rounds, and power-ups
-- **Sprint** — solve as many targets as possible in 60 seconds
-- **Survival** — four misses costs a life; the run ends when all lives are gone
-- **Endless** — the number range keeps expanding
-- **Daily** — one date-seeded target with seven guesses and no power-ups
-- **Duel** — pass-the-phone two-player mode; alternate after every miss and race to three round wins
+### Party Lab
+- **Local player profiles** — save up to six names and keep local records
+- **Custom games** — choose range, guess limit, timer, hints, Power Deck, and jackpot finish
+- **Challenge Codes** — compact deterministic codes recreate the same range, rules, and target on any device; no server required
+- **Tournament mode** — choose 3–6 saved players, 1–5 rounds, range, and guess limit
+  - each player gets a private deterministic target at equal difficulty
+  - fewer guesses earns more tournament points
+  - local tournament wins are tracked per profile
 
-### Arcade systems
+## Storage
 
-- Quick-win combo multiplier up to 2x
-- Every third solo level becomes a 2x Jackpot Round
-- Heat Check challenge: three quick wins earns a +100 bonus
-- Three one-use Power Deck cards per run:
-  - Scanner narrows the target range
-  - Double Up doubles the next correct hit
-  - Lucky Break gives a mode-specific bonus
-- Hot / warm / cold proximity feedback and one-away callouts
-- Win flashes, confetti, haptics, and arcade sound cues
-- Ten achievements
-- Persistent stats, records, game history, and daily results
-- JSON backup and restore
-- Light, dark, and system themes
-- Shareable results
-- Responsive mobile-first UI
-- Installable PWA with offline app shell
+Guess Arcade stores data in `localStorage` under `guess-arcade-v2`.
 
-## Local-first storage
+The key intentionally stays unchanged so v2/v3 players retain their history. v4 merges in profiles, challenge stats, and tournament stats automatically.
 
-Guess Arcade stores player data in `localStorage` under `guess-arcade-v2`. The storage key stays the same so existing v2 players keep their history and settings; new v3 stats are merged in automatically.
-
-There is no login, cloud database, secret, or environment variable required.
+No authentication, cloud database, secrets, or environment variables are required.
 
 ## Run locally
 
@@ -47,12 +38,12 @@ npm install
 npm start
 ```
 
-Then open `http://localhost:3000`.
+Open `http://localhost:3000`.
 
 ## Deploy
 
-`netlify.toml` publishes the repository root directly. Netlify can deploy straight from `master`.
+`netlify.toml` publishes the repository root. Netlify deploys automatically from `master`.
 
 ## Legacy route
 
-`guessingGame.html` remains as a compatibility redirect to `index.html`.
+`guessingGame.html` remains a compatibility redirect to `index.html`.

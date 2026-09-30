@@ -24,6 +24,7 @@
       </div>
       <div class="top-actions">
         <button class="icon-button" id="theme-toggle" type="button" aria-label="Toggle theme">☾</button>
+        <button class="ghost-button" id="players-button" type="button">Players</button>
         <button class="ghost-button" id="stats-button" type="button">Stats</button>
         <button class="ghost-button" id="settings-button" type="button">Settings</button>
       </div>
@@ -88,6 +89,14 @@
               <div class="pill" id="range-pill">1–25</div>
             </div>
           </div>
+
+          <section class="tournament-scoreboard hidden" id="tournament-scoreboard" aria-label="Tournament standings">
+            <div class="tournament-head">
+              <span class="eyebrow">TOURNAMENT</span>
+              <strong id="tournament-round-label">Round 1</strong>
+            </div>
+            <div class="tournament-players" id="tournament-players"></div>
+          </section>
 
           <section class="duel-scoreboard hidden" id="duel-scoreboard" aria-label="Duel score">
             <div class="duel-player active" id="duel-player-1">
@@ -173,6 +182,19 @@
             <div class="challenge-track"><div id="challenge-fill"></div></div>
           </section>
 
+          <section class="panel party-panel">
+            <div class="panel-head">
+              <div><span class="eyebrow">PARTY LAB</span><h3>Make it yours</h3></div>
+              <span class="daily-status" id="active-player-badge">Guest</span>
+            </div>
+            <p>Build a custom game, send somebody the exact same challenge, or run a local tournament.</p>
+            <div class="party-actions">
+              <button class="secondary-button" id="custom-game-button" type="button">Custom game</button>
+              <button class="secondary-button" id="challenge-code-button" type="button">Challenge code</button>
+              <button class="secondary-button" id="tournament-button" type="button">Tournament</button>
+            </div>
+          </section>
+
           <section class="panel daily-panel">
             <div class="panel-head">
               <div><span class="eyebrow">TODAY</span><h3>Daily challenge</h3></div>
@@ -196,6 +218,95 @@
       </section>
     </main>
   </div>
+
+  <dialog id="players-dialog" class="dialog">
+    <form method="dialog" class="dialog-card" id="players-form">
+      <div class="dialog-head">
+        <div><span class="eyebrow">LOCAL PLAYERS</span><h2>Player profiles</h2></div>
+        <button class="icon-button" value="close" aria-label="Close players">×</button>
+      </div>
+      <p class="dialog-copy">Save up to six names on this device. Profiles power local records and tournament play.</p>
+      <div class="profile-list" id="profile-list"></div>
+      <div class="inline-form">
+        <input id="profile-name-input" type="text" maxlength="18" placeholder="Add player name" autocomplete="off">
+        <button class="primary-button" id="add-profile-button" type="button">Add</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="custom-dialog" class="dialog">
+    <form method="dialog" class="dialog-card" id="custom-form">
+      <div class="dialog-head">
+        <div><span class="eyebrow">CUSTOM MODE</span><h2>Build your game</h2></div>
+        <button class="icon-button" value="close" aria-label="Close custom game">×</button>
+      </div>
+      <div class="builder-grid">
+        <label><span>Maximum number</span><input id="custom-max" type="number" min="10" max="100000" value="100"></label>
+        <label><span>Guess limit</span><input id="custom-attempts" type="number" min="3" max="50" value="10"></label>
+        <label><span>Timer (seconds)</span><input id="custom-seconds" type="number" min="0" max="300" value="0"></label>
+        <label><span>Hints</span><input id="custom-hints" type="number" min="0" max="5" value="2"></label>
+      </div>
+      <label class="setting-row compact-setting">
+        <span><strong>Power Deck</strong><small>Allow the three one-use power-ups.</small></span>
+        <input id="custom-powers" type="checkbox" checked>
+      </label>
+      <label class="setting-row compact-setting">
+        <span><strong>Jackpot finish</strong><small>Double the score for solving the custom round.</small></span>
+        <input id="custom-jackpot" type="checkbox">
+      </label>
+      <button class="primary-button wide-button" id="start-custom-button" type="button">Start custom game</button>
+    </form>
+  </dialog>
+
+  <dialog id="challenge-dialog" class="dialog">
+    <form method="dialog" class="dialog-card" id="challenge-form">
+      <div class="dialog-head">
+        <div><span class="eyebrow">CHALLENGE CODES</span><h2>Same puzzle. Any device.</h2></div>
+        <button class="icon-button" value="close" aria-label="Close challenge codes">×</button>
+      </div>
+      <p class="dialog-copy">A code stores the range, guess limit, hints, and target seed. No server is involved.</p>
+      <div class="challenge-builder">
+        <div class="builder-grid">
+          <label><span>Maximum number</span><input id="challenge-max" type="number" min="10" max="100000" value="100"></label>
+          <label><span>Guess limit</span><input id="challenge-attempts" type="number" min="3" max="50" value="7"></label>
+          <label><span>Hints</span><input id="challenge-hints" type="number" min="0" max="5" value="1"></label>
+        </div>
+        <button class="secondary-button wide-button" id="generate-challenge-button" type="button">Generate code</button>
+        <div class="code-box hidden" id="generated-code-box">
+          <span>Your challenge code</span>
+          <strong id="generated-code"></strong>
+          <div class="code-actions">
+            <button class="secondary-button" id="copy-challenge-button" type="button">Copy</button>
+            <button class="primary-button" id="play-generated-challenge-button" type="button">Play it</button>
+          </div>
+        </div>
+        <div class="join-code">
+          <label for="join-challenge-input">Got a code?</label>
+          <div class="inline-form">
+            <input id="join-challenge-input" type="text" placeholder="GA-2S-7-1-ABC" autocomplete="off" autocapitalize="characters">
+            <button class="primary-button" id="join-challenge-button" type="button">Play</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="tournament-dialog" class="dialog">
+    <form method="dialog" class="dialog-card" id="tournament-form">
+      <div class="dialog-head">
+        <div><span class="eyebrow">PARTY MODE</span><h2>Start a tournament</h2></div>
+        <button class="icon-button" value="close" aria-label="Close tournament">×</button>
+      </div>
+      <p class="dialog-copy">Choose 3–6 saved players. Everyone gets the same difficulty but a private target each turn.</p>
+      <div class="tournament-picker" id="tournament-picker"></div>
+      <div class="builder-grid tournament-settings">
+        <label><span>Rounds</span><input id="tournament-rounds" type="number" min="1" max="5" value="3"></label>
+        <label><span>Maximum number</span><input id="tournament-max" type="number" min="20" max="10000" value="100"></label>
+        <label><span>Guesses per turn</span><input id="tournament-attempts" type="number" min="3" max="20" value="7"></label>
+      </div>
+      <button class="primary-button wide-button" id="start-tournament-button" type="button">Start tournament</button>
+    </form>
+  </dialog>
 
   <dialog id="stats-dialog" class="dialog">
     <form method="dialog" class="dialog-card">
