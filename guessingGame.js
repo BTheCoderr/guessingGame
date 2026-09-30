@@ -7,7 +7,10 @@
     survival: { label:'Survival', startMax:40, hints:1, lives:3, subtitle:'Four misses costs a life. Protect all three.' },
     endless: { label:'Endless', startMax:20, hints:3, subtitle:'No finish line. The range keeps getting meaner.' },
     daily: { label:'Daily', startMax:100, hints:0, dailyAttempts:7, subtitle:'One date-seeded target. Seven tries. No boosts.' },
-    duel: { label:'Duel', startMax:50, hints:0, subtitle:'Pass the phone. Alternate guesses. First player to three rounds wins.' }
+    duel: { label:'Duel', startMax:50, hints:0, subtitle:'Pass the phone. Alternate guesses. First player to three rounds wins.' },
+    custom: { label:'Custom', startMax:100, hints:2, subtitle:'Your rules. Your range. Your run.' },
+    challenge: { label:'Challenge', startMax:100, hints:1, subtitle:'A shareable seeded puzzle that plays the same on any device.' },
+    tournament: { label:'Tournament', startMax:100, hints:0, subtitle:'Local party play for 3–6 saved players.' }
   };
 
   const ACHIEVEMENTS = [
@@ -20,19 +23,25 @@
     { id:'score', icon:'★', name:'High Roller', description:'Score 500+ in one run.', test:s => s.bestScore >= 500 },
     { id:'jackpot', icon:'×2', name:'Jackpot', description:'Clear a double-score jackpot round.', test:s => s.bonusWins >= 1 },
     { id:'daily', icon:'◫', name:'Daily Mind', description:'Complete a daily challenge.', test:s => s.dailyCompleted >= 1 },
-    { id:'duel', icon:'⚔', name:'Face Off', description:'Finish a two-player Duel match.', test:s => s.duelMatches >= 1 }
+    { id:'duel', icon:'⚔', name:'Face Off', description:'Finish a two-player Duel match.', test:s => s.duelMatches >= 1 },
+    { id:'challenger', icon:'#', name:'Code Cracker', description:'Beat a shared Challenge Code.', test:s => s.challengeWins >= 1 },
+    { id:'host', icon:'☰', name:'Party Starter', description:'Finish your first local tournament.', test:s => s.tournamentMatches >= 1 },
+    { id:'champ', icon:'♛', name:'House Champ', description:'Win a local tournament.', test:s => s.tournamentWins >= 1 }
   ];
 
   const defaultState = () => ({
-    version:3,
+    version:4,
     stats:{
       gamesPlayed:0, wins:0, bestScore:0, currentStreak:0, bestStreak:0,
       totalGuesses:0, fastestWinMs:0, bestAttempts:0, dailyCompleted:0,
-      perfectWins:0, bestCombo:0, bonusWins:0, duelMatches:0
+      perfectWins:0, bestCombo:0, bonusWins:0, duelMatches:0,
+      challengeWins:0, tournamentMatches:0, tournamentWins:0
     },
     history:[],
     unlocked:[],
     daily:{},
+    profiles:[{ id:'guest', name:'Guest', stats:{ games:0, wins:0, bestScore:0, challengesWon:0, tournamentWins:0 } }],
+    activeProfileId:'guest',
     settings:{ theme:'dark', sound:true, haptics:true }
   });
 
@@ -48,7 +57,9 @@
         settings:{ ...base.settings, ...(saved.settings || {}) },
         history:Array.isArray(saved.history) ? saved.history : [],
         unlocked:Array.isArray(saved.unlocked) ? saved.unlocked : [],
-        daily:saved.daily && typeof saved.daily === 'object' ? saved.daily : {}
+        daily:saved.daily && typeof saved.daily === 'object' ? saved.daily : {},
+        profiles:Array.isArray(saved.profiles) && saved.profiles.length ? saved.profiles.slice(0,6) : base.profiles,
+        activeProfileId:saved.activeProfileId || (saved.profiles?.[0]?.id ?? 'guest')
       };
     } catch {
       return defaultState();
@@ -80,6 +91,16 @@
     newGameButton:$('new-game-button'),
     challengeTitle:$('challenge-title'), challengeStatus:$('challenge-status'), challengeCopy:$('challenge-copy'), challengeFill:$('challenge-fill'),
     dailyDate:$('daily-date'), dailyStatus:$('daily-status'), playDailyButton:$('play-daily-button'),
+    activePlayerBadge:$('active-player-badge'),
+    playersDialog:$('players-dialog'), profileList:$('profile-list'), profileNameInput:$('profile-name-input'),
+    customDialog:$('custom-dialog'), customMax:$('custom-max'), customAttempts:$('custom-attempts'), customSeconds:$('custom-seconds'),
+    customHints:$('custom-hints'), customPowers:$('custom-powers'), customJackpot:$('custom-jackpot'),
+    challengeDialog:$('challenge-dialog'), challengeMax:$('challenge-max'), challengeAttempts:$('challenge-attempts'),
+    challengeHints:$('challenge-hints'), generatedCodeBox:$('generated-code-box'), generatedCode:$('generated-code'),
+    joinChallengeInput:$('join-challenge-input'),
+    tournamentDialog:$('tournament-dialog'), tournamentPicker:$('tournament-picker'), tournamentRounds:$('tournament-rounds'),
+    tournamentMax:$('tournament-max'), tournamentAttempts:$('tournament-attempts'),
+    tournamentBoard:$('tournament-scoreboard'), tournamentPlayers:$('tournament-players'), tournamentRoundLabel:$('tournament-round-label'),
     achievementList:$('achievement-list'), achievementCount:$('achievement-count'),
     heroBestScore:$('hero-best-score'), heroCombo:$('hero-combo'), heroGames:$('hero-games'),
     statsDialog:$('stats-dialog'), settingsDialog:$('settings-dialog'), statsGrid:$('stats-grid'), gameHistory:$('game-history'),
@@ -90,7 +111,43 @@
 
   const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(persistent));
   const randomTarget = max => Math.floor(Math.random() * max) + 1;
-  const getModeConfig = () => MODES[session.mode] || MODES.classic;
+  const activeProfile = () => persistent.profiles.find(p => p.id === persistent.activeProfileId) || persistent.profiles[0];
+  const normalizeProfile = p => ({
+    id:p.id, name:p.name,
+    stats:{ games:0, wins:0, bestScore:0, challengesWon:0, tournamentWins:0, ...(p.stats || {}) }
+  });
+  persistent.profiles = persistent.profiles.map(normalizeProfile);
+  if (!persistent.profiles.some(p => p.id === persistent.activeProfileId)) persistent.activeProfileId = persistent.profiles[0]?.id || 'guest';
+
+  const getModeConfig = () => {
+    if (session.mode === 'custom' && session.custom) {
+      return { ...MODES.custom, hints:session.custom.hints, timed:session.custom.seconds > 0, seconds:session.custom.seconds };
+    }
+    if (session.mode === 'challenge' && session.challengeData) {
+      return { ...MODES.challenge, hints:session.challengeData.hints, timed:false };
+    }
+    return MODES[session.mode] || MODES.classic;
+  };
+
+  const seededTarget = (seed, max) => {
+    let x = Math.abs(Number(seed) || 1) >>> 0;
+    x = Math.imul(x ^ (x >>> 16), 2246822507);
+    x = Math.imul(x ^ (x >>> 13), 3266489909);
+    x = (x ^ (x >>> 16)) >>> 0;
+    return (x % max) + 1;
+  };
+
+  const encodeChallenge = ({max, attempts, hints, seed}) =>
+    `GA-${Number(max).toString(36).toUpperCase()}-${Number(attempts).toString(36).toUpperCase()}-${Number(hints).toString(36).toUpperCase()}-${Number(seed).toString(36).toUpperCase()}`;
+
+  const decodeChallenge = raw => {
+    const parts = String(raw || '').trim().toUpperCase().split('-');
+    if (parts.length !== 5 || parts[0] !== 'GA') return null;
+    const [max,attempts,hints,seed] = parts.slice(1).map(v => parseInt(v,36));
+    if (![max,attempts,hints,seed].every(Number.isFinite)) return null;
+    if (max < 10 || max > 100000 || attempts < 3 || attempts > 50 || hints < 0 || hints > 5 || seed < 1) return null;
+    return { max, attempts, hints, seed, code:encodeChallenge({max,attempts,hints,seed}) };
+  };
 
   const todayKey = () => {
     const d = new Date();
@@ -216,7 +273,12 @@
       doubleNext:false,
       powerups:{ scan:false, double:false, lucky:false },
       dailyLocked:mode === 'daily' && !!dailyRecord?.completed,
-      duel:mode === 'duel' ? { round:1, scores:[0,0], current:0, starter:0, goal:3 } : null
+      attemptLimit:0,
+      allowPowers:!['daily','duel','challenge','tournament'].includes(mode),
+      custom:null,
+      challengeData:null,
+      duel:mode === 'duel' ? { round:1, scores:[0,0], current:0, starter:0, goal:3 } : null,
+      tournament:null
     };
   };
 
@@ -241,6 +303,73 @@
 
   const setActiveMode = mode =>
     document.querySelectorAll('.mode-card').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
+
+  const startCustom = config => {
+    stopTimer();
+    session = makeSession('custom');
+    session.custom = config;
+    session.max = config.max;
+    session.target = randomTarget(config.max);
+    session.hintsLeft = config.hints;
+    session.timeRemaining = config.seconds;
+    session.attemptLimit = config.attempts;
+    session.allowPowers = config.powers;
+    session.bonusRound = config.jackpot;
+    setActiveMode('');
+    resetSignal();
+    renderAll();
+    els.customDialog.close();
+    els.input.focus({preventScroll:true});
+  };
+
+  const startChallenge = data => {
+    stopTimer();
+    session = makeSession('challenge');
+    session.challengeData = data;
+    session.max = data.max;
+    session.target = seededTarget(data.seed, data.max);
+    session.hintsLeft = data.hints;
+    session.attemptLimit = data.attempts;
+    session.allowPowers = false;
+    setActiveMode('');
+    resetSignal();
+    showSignal('CHALLENGE LOADED', `${data.code} · ${data.attempts} guesses to crack it.`, '#', 0);
+    renderAll();
+    els.challengeDialog.close();
+    els.input.focus({preventScroll:true});
+  };
+
+  const tournamentTarget = () => seededTarget(
+    session.tournament.seed + session.tournament.round * 1009 + session.tournament.current * 97,
+    session.tournament.max
+  );
+
+  const startTournament = ({profileIds, rounds, max, attempts}) => {
+    const players = profileIds
+      .map(id => persistent.profiles.find(p => p.id === id))
+      .filter(Boolean)
+      .slice(0,6)
+      .map(p => ({ id:p.id, name:p.name, score:0, roundScore:0 }));
+    if (players.length < 3) return toast('Choose at least 3 saved players.');
+
+    stopTimer();
+    session = makeSession('tournament');
+    session.tournament = {
+      players, rounds, round:1, current:0, max, attemptLimit:attempts,
+      seed:(Date.now() % 2147483647) || 1,
+      profileIds:[...profileIds]
+    };
+    session.max = max;
+    session.attemptLimit = attempts;
+    session.target = tournamentTarget();
+    session.allowPowers = false;
+    setActiveMode('');
+    resetSignal();
+    showSignal('TOURNAMENT START', `${players[0].name}, you’re first. You have ${attempts} guesses.`, '♛', 0);
+    renderAll();
+    els.tournamentDialog.close();
+    els.input.focus({preventScroll:true});
+  };
 
   const startClockIfNeeded = () => {
     const config = getModeConfig();
@@ -292,12 +421,15 @@
 
     session.guesses.unshift({
       value:guess, direction, distance, closeness,
-      player:session.mode === 'duel' ? session.duel.current + 1 : null
+      player:session.mode === 'duel' ? session.duel.current + 1 : null,
+      playerLabel:session.mode === 'tournament' ? session.tournament.players[session.tournament.current].name : null
     });
     session.guesses = session.guesses.slice(0, 9);
 
     if (session.mode === 'duel') {
       handleDuelGuess(guess, delta, distance, closeness, direction);
+    } else if (session.mode === 'tournament') {
+      handleTournamentGuess(guess, delta, distance, closeness, direction);
     } else if (delta === 0) {
       handleSoloWin();
     } else {
@@ -347,6 +479,10 @@
       };
       persistent.stats.dailyCompleted += 1;
       finishRun(false, `Daily finished. The number was ${session.target}.`);
+    }
+
+    if (['custom','challenge'].includes(session.mode) && session.attemptLimit > 0 && session.roundAttempts >= session.attemptLimit) {
+      finishRun(false, `Out of guesses. The number was ${session.target}.`);
     }
   };
 
@@ -404,6 +540,17 @@
       return;
     }
 
+    if (session.mode === 'challenge') {
+      persistent.stats.challengeWins += 1;
+      finishRun(true, `Challenge cracked in ${session.roundAttempts}/${session.attemptLimit} guesses. Code: ${session.challengeData.code}`);
+      return;
+    }
+
+    if (session.mode === 'custom') {
+      finishRun(true, `Custom game cleared in ${session.roundAttempts}/${session.attemptLimit} guesses.`);
+      return;
+    }
+
     if (session.mode === 'sprint') {
       setTimeout(() => {
         if (!session.runFinished) nextRound();
@@ -448,6 +595,92 @@
     );
   };
 
+  const handleTournamentGuess = (guess, delta, distance, closeness, direction) => {
+    const t = session.tournament;
+    const player = t.players[t.current];
+
+    if (delta === 0) {
+      const points = Math.max(1, t.attemptLimit - session.roundAttempts + 1);
+      player.score += points;
+      player.roundScore = points;
+      session.completed = true;
+      feedback('bonus');
+      burstConfetti(false);
+      showSignal('TURN CLEARED', `${player.name} solved it in ${session.roundAttempts}. +${points} tournament points.`, '✓', 100);
+      els.resultActions.classList.remove('hidden');
+      return;
+    }
+
+    feedback(closeness >= 58 ? 'hot' : 'miss');
+    pulseHeat(closeness, distance === 1);
+    showSignal(
+      distance === 1 ? 'ONE AWAY!' : `${heatLabel(closeness)} · GO ${direction.toUpperCase()}`,
+      `${player.name} has ${Math.max(0,t.attemptLimit-session.roundAttempts)} guesses left.`,
+      direction === 'higher' ? '↑' : '↓',
+      closeness
+    );
+
+    if (session.roundAttempts >= t.attemptLimit) {
+      player.roundScore = 0;
+      session.completed = true;
+      showSignal('TURN OVER', `${player.name} ran out of guesses. The target was ${session.target}.`, '×', 0);
+      els.resultActions.classList.remove('hidden');
+    }
+  };
+
+  const advanceTournament = () => {
+    const t = session.tournament;
+    if (t.current < t.players.length - 1) {
+      t.current += 1;
+    } else {
+      t.current = 0;
+      t.round += 1;
+      if (t.round > t.rounds) return finishTournament();
+    }
+
+    session.completed = false;
+    session.roundAttempts = 0;
+    session.guesses = [];
+    session.target = tournamentTarget();
+    session.roundStartedAt = Date.now();
+    els.resultActions.classList.add('hidden');
+    showSignal('NEXT TURN', `${t.players[t.current].name}, you have ${t.attemptLimit} guesses.`, '♛', 0);
+    renderAll();
+    els.input.focus({preventScroll:true});
+  };
+
+  const finishTournament = () => {
+    const t = session.tournament;
+    session.runFinished = true;
+    session.completed = true;
+    stopTimer();
+    persistent.stats.gamesPlayed += 1;
+    persistent.stats.tournamentMatches += 1;
+
+    const best = Math.max(...t.players.map(p => p.score));
+    const winners = t.players.filter(p => p.score === best);
+    persistent.stats.tournamentWins += 1;
+    for (const winner of winners) {
+      const profile = persistent.profiles.find(p => p.id === winner.id);
+      if (profile) profile.stats.tournamentWins += 1;
+    }
+
+    persistent.history.unshift({
+      date:new Date().toISOString(), mode:'tournament',
+      score:t.players.map(p => `${p.name}:${p.score}`).join(', '),
+      level:t.rounds, attempts:session.attempts, won:true,
+      winner:winners.map(p => p.name).join(' + ')
+    });
+    persistent.history = persistent.history.slice(0,20);
+    save();
+    evaluateAchievements();
+    burstConfetti(true);
+    showSignal('TOURNAMENT OVER', `♛ ${winners.map(p=>p.name).join(' + ')} ${winners.length > 1 ? 'tie' : 'wins'} with ${best} points!`, '♛', 100);
+    els.resultActions.classList.remove('hidden');
+    els.nextButton.textContent = 'Run it back';
+    renderAll();
+  };
+
   const finishDuel = winner => {
     session.runFinished = true;
     stopTimer();
@@ -466,6 +699,30 @@
   };
 
   const nextRound = () => {
+    if (session.mode === 'tournament') {
+      if (session.runFinished) {
+        startTournament({
+          profileIds:session.tournament.profileIds,
+          rounds:session.tournament.rounds,
+          max:session.tournament.max,
+          attempts:session.tournament.attemptLimit
+        });
+      } else {
+        advanceTournament();
+      }
+      return;
+    }
+
+    if (session.mode === 'custom' && session.runFinished) {
+      startCustom({...session.custom});
+      return;
+    }
+
+    if (session.mode === 'challenge' && session.runFinished) {
+      startChallenge({...session.challengeData});
+      return;
+    }
+
     if (session.mode === 'duel') {
       if (session.runFinished) {
         newSession('duel');
@@ -526,6 +783,16 @@
     if (!won && !['sprint','daily'].includes(session.mode)) persistent.stats.currentStreak = 0;
     persistent.stats.bestScore = Math.max(persistent.stats.bestScore, session.score);
 
+    if (!['duel','tournament'].includes(session.mode)) {
+      const profile = activeProfile();
+      if (profile) {
+        profile.stats.games += 1;
+        if (won) profile.stats.wins += 1;
+        profile.stats.bestScore = Math.max(profile.stats.bestScore, Number(session.score) || 0);
+        if (won && session.mode === 'challenge') profile.stats.challengesWon += 1;
+      }
+    }
+
     persistent.history.unshift({
       date:new Date().toISOString(), mode:session.mode, score:session.score,
       level:session.level, attempts:session.attempts, won
@@ -564,7 +831,7 @@
   };
 
   const useHint = () => {
-    if (session.completed || session.runFinished || session.dailyLocked || ['daily','duel'].includes(session.mode)) return;
+    if (session.completed || session.runFinished || session.dailyLocked || ['daily','duel','tournament'].includes(session.mode)) return;
     if (session.hintsLeft <= 0) return toast('No hints left this round.');
 
     startClockIfNeeded();
@@ -578,7 +845,7 @@
   };
 
   const usePower = type => {
-    if (session.completed || session.runFinished || ['daily','duel'].includes(session.mode)) return;
+    if (session.completed || session.runFinished || !session.allowPowers) return;
     if (session.powerups[type]) return toast('That power-up is already spent.');
 
     startClockIfNeeded();
@@ -657,6 +924,8 @@
     renderChallenge();
     renderPowerDeck();
     renderDuel();
+    renderTournament();
+    renderProfiles();
   };
 
   const renderGame = () => {
@@ -665,6 +934,9 @@
     els.modeTitle.textContent =
       session.mode === 'daily' ? 'Today’s puzzle' :
       session.mode === 'duel' ? `Round ${session.duel.round}` :
+      session.mode === 'tournament' ? `Round ${session.tournament.round} · ${session.tournament.players[session.tournament.current].name}` :
+      session.mode === 'challenge' ? 'Challenge Code' :
+      session.mode === 'custom' ? 'Custom game' :
       `Level ${session.level}`;
     els.modeDescription.textContent = config.subtitle;
     els.rangePill.textContent = `1–${session.max.toLocaleString()}`;
@@ -673,10 +945,13 @@
     els.hintsLeft.textContent = `(${session.hintsLeft})`;
 
     els.comboValue.textContent = `x${comboMultiplier(session.combo).toFixed(2)}`;
-    els.comboPill.classList.toggle('hidden', ['daily','duel'].includes(session.mode));
+    els.comboPill.classList.toggle('hidden', ['daily','duel','challenge','tournament'].includes(session.mode));
     els.jackpotPill.classList.toggle('hidden', !session.bonusRound || session.completed);
 
-    els.guessLabel.textContent = session.mode === 'duel' ? `Player ${session.duel.current + 1} guess` : 'Your guess';
+    els.guessLabel.textContent =
+      session.mode === 'duel' ? `Player ${session.duel.current + 1} guess` :
+      session.mode === 'tournament' ? `${session.tournament.players[session.tournament.current].name} guess` :
+      'Your guess';
 
     if (!session.completed && !session.runFinished && !session.dailyLocked) unlockRound();
     else lockRound();
@@ -689,6 +964,21 @@
   };
 
   const renderMetrics = () => {
+    if (session.mode === 'tournament') {
+      const t = session.tournament;
+      const player = t.players[t.current];
+      els.metricOneLabel.textContent = 'Round';
+      els.score.textContent = `${Math.min(t.round,t.rounds)}/${t.rounds}`;
+      els.metricTwoLabel.textContent = 'Turn guesses';
+      els.attempts.textContent = `${session.roundAttempts}/${t.attemptLimit}`;
+      els.timerLabel.textContent = 'Player';
+      els.timer.textContent = player.name;
+      els.resourceLabel.textContent = 'Points';
+      els.resource.textContent = player.score;
+      els.hintButton.classList.add('hidden');
+      return;
+    }
+
     if (session.mode === 'duel') {
       els.metricOneLabel.textContent = 'Round';
       els.score.textContent = session.duel.round;
@@ -720,12 +1010,15 @@
     } else if (session.mode === 'daily') {
       els.resourceLabel.textContent = 'Tries left';
       els.resource.textContent = Math.max(0, MODES.daily.dailyAttempts - session.roundAttempts);
+    } else if (['custom','challenge'].includes(session.mode)) {
+      els.resourceLabel.textContent = 'Tries left';
+      els.resource.textContent = Math.max(0, session.attemptLimit - session.roundAttempts);
     } else {
       els.resourceLabel.textContent = 'Hints';
       els.resource.textContent = session.hintsLeft;
     }
 
-    els.hintButton.classList.toggle('hidden', ['daily','duel'].includes(session.mode));
+    els.hintButton.classList.toggle('hidden', ['daily','duel','tournament'].includes(session.mode));
   };
 
   const renderGuessHistory = () => {
@@ -737,7 +1030,7 @@
     els.guessHistory.innerHTML = session.guesses.map(g => `
       <li>
         <span class="guess-number">${g.value}</span>
-        <span class="guess-direction">${g.player ? `P${g.player} · ` : ''}${g.direction === 'correct' ? 'Target found' : `Go ${g.direction}`}</span>
+        <span class="guess-direction">${g.playerLabel ? `${g.playerLabel} · ` : g.player ? `P${g.player} · ` : ''}${g.direction === 'correct' ? 'Target found' : `Go ${g.direction}`}</span>
         <span class="guess-distance">${g.direction === 'correct' ? 'hit' : g.distance === 1 ? '1 away' : g.closeness >= 70 ? 'hot' : g.closeness >= 40 ? 'warm' : 'cold'}</span>
       </li>
     `).join('');
@@ -747,6 +1040,7 @@
     els.heroBestScore.textContent = persistent.stats.bestScore.toLocaleString();
     els.heroCombo.textContent = persistent.stats.bestCombo;
     els.heroGames.textContent = persistent.stats.gamesPlayed;
+    els.activePlayerBadge.textContent = activeProfile()?.name || 'Guest';
     renderAchievements();
   };
 
@@ -764,6 +1058,31 @@
       els.challengeCopy.textContent = 'Alternate after every miss. The round winner earns one point. First player to three takes the match.';
       els.challengeStatus.textContent = `${session.duel.scores[0]}–${session.duel.scores[1]}`;
       els.challengeFill.style.width = `${Math.max(...session.duel.scores) / 3 * 100}%`;
+      return;
+    }
+
+    if (session.mode === 'tournament') {
+      const t = session.tournament;
+      els.challengeTitle.textContent = 'Party Bracket';
+      els.challengeCopy.textContent = 'Each player gets a private target at the same difficulty. Fewer guesses earns more points.';
+      els.challengeStatus.textContent = `${Math.min(t.round,t.rounds)}/${t.rounds}`;
+      els.challengeFill.style.width = `${Math.min(t.round,t.rounds) / t.rounds * 100}%`;
+      return;
+    }
+
+    if (session.mode === 'challenge') {
+      els.challengeTitle.textContent = 'Code Challenge';
+      els.challengeCopy.textContent = `${session.challengeData.code} · Same seeded target on every device.`;
+      els.challengeStatus.textContent = `${session.roundAttempts}/${session.attemptLimit}`;
+      els.challengeFill.style.width = `${session.roundAttempts / session.attemptLimit * 100}%`;
+      return;
+    }
+
+    if (session.mode === 'custom') {
+      els.challengeTitle.textContent = 'House Rules';
+      els.challengeCopy.textContent = `1–${session.max.toLocaleString()} · ${session.attemptLimit} guesses${session.custom.seconds ? ` · ${session.custom.seconds}s` : ''}.`;
+      els.challengeStatus.textContent = `${session.roundAttempts}/${session.attemptLimit}`;
+      els.challengeFill.style.width = `${session.roundAttempts / session.attemptLimit * 100}%`;
       return;
     }
 
@@ -785,7 +1104,7 @@
   };
 
   const renderPowerDeck = () => {
-    const disabledMode = ['daily','duel'].includes(session.mode);
+    const disabledMode = !session.allowPowers;
     els.powerDeck.classList.toggle('hidden', disabledMode);
 
     for (const [type, button] of [['scan',els.powerScan],['double',els.powerDouble],['lucky',els.powerLucky]]) {
@@ -806,6 +1125,34 @@
     els.duelRound.textContent = session.duel.round;
     els.duelP1.classList.toggle('active', session.duel.current === 0 && !session.completed);
     els.duelP2.classList.toggle('active', session.duel.current === 1 && !session.completed);
+  };
+
+  const renderTournament = () => {
+    const active = session.mode === 'tournament';
+    els.tournamentBoard.classList.toggle('hidden', !active);
+    if (!active) return;
+    const t = session.tournament;
+    els.tournamentRoundLabel.textContent = `Round ${Math.min(t.round,t.rounds)} of ${t.rounds}`;
+    els.tournamentPlayers.innerHTML = t.players.map((p,i) => `
+      <div class="tournament-player ${i === t.current && !session.runFinished ? 'active' : ''}">
+        <span>${p.name}</span><strong>${p.score} pts</strong>
+      </div>
+    `).join('');
+  };
+
+  const renderProfiles = () => {
+    if (!els.profileList) return;
+    els.profileList.innerHTML = persistent.profiles.map(p => `
+      <div class="profile-row ${p.id === persistent.activeProfileId ? 'active' : ''}">
+        <span><strong>${p.name}</strong><small>${p.stats.wins} wins · best ${p.stats.bestScore} · ${p.stats.tournamentWins} tournament wins</small></span>
+        <button class="profile-chip ${p.id === persistent.activeProfileId ? 'active' : ''}" type="button" data-activate-profile="${p.id}">${p.id === persistent.activeProfileId ? 'Active' : 'Use'}</button>
+        <button class="profile-chip" type="button" data-delete-profile="${p.id}" ${persistent.profiles.length === 1 ? 'disabled' : ''}>Remove</button>
+      </div>
+    `).join('');
+
+    els.tournamentPicker.innerHTML = persistent.profiles.map(p => `
+      <label class="tournament-pick"><input type="checkbox" value="${p.id}"><span>${p.name}</span></label>
+    `).join('');
   };
 
   const renderAchievements = () => {
@@ -837,6 +1184,7 @@
       ['Games',s.gamesPlayed], ['Solo wins',s.wins], ['Best score',s.bestScore.toLocaleString()],
       ['Best combo',s.bestCombo], ['Best streak',s.bestStreak], ['Best guesses',s.bestAttempts || '—'],
       ['Fastest round',formatTime(s.fastestWinMs)], ['Perfect hits',s.perfectWins], ['Duel matches',s.duelMatches],
+      ['Challenges won',s.challengeWins], ['Tournaments',s.tournamentMatches], ['Tournament wins',s.tournamentWins],
       ['Total guesses',s.totalGuesses.toLocaleString()], ['Win/guess rate',`${accuracy}%`], ['Daily clears',s.dailyCompleted]
     ];
     els.statsGrid.innerHTML = items.map(([label,value]) => `<div class="stat-tile"><span>${label}</span><strong>${value}</strong></div>`).join('');
@@ -906,7 +1254,7 @@
   };
 
   const resetData = () => {
-    if (!confirm('Reset all local stats, achievements, settings, and daily history?')) return;
+    if (!confirm('Reset all local stats, profiles, achievements, settings, and daily history?')) return;
     persistent = defaultState(); save(); applyTheme(); newSession('classic'); els.settingsDialog.close(); toast('Local data reset.');
   };
 
@@ -928,6 +1276,96 @@
   els.shareButton.addEventListener('click', shareResult);
   els.newGameButton.addEventListener('click', () => { endCurrentRunForRestart(); newSession(session.mode); });
   els.playDailyButton.addEventListener('click', () => { endCurrentRunForRestart(); newSession('daily'); });
+  $('players-button').addEventListener('click', () => { renderProfiles(); els.playersDialog.showModal(); });
+  $('custom-game-button').addEventListener('click', () => els.customDialog.showModal());
+  $('challenge-code-button').addEventListener('click', () => els.challengeDialog.showModal());
+  $('tournament-button').addEventListener('click', () => { renderProfiles(); els.tournamentDialog.showModal(); });
+
+  $('add-profile-button').addEventListener('click', () => {
+    const name = els.profileNameInput.value.trim().replace(/[<>]/g,'').slice(0,18);
+    if (!name) return toast('Enter a player name.');
+    if (persistent.profiles.length >= 6) return toast('Six local players is the max.');
+    if (persistent.profiles.some(p => p.name.toLowerCase() === name.toLowerCase())) return toast('That player already exists.');
+    const id = `p-${Date.now().toString(36)}`;
+    persistent.profiles.push(normalizeProfile({id,name,stats:{}}));
+    persistent.activeProfileId = id;
+    els.profileNameInput.value = '';
+    save(); renderAll();
+  });
+
+  els.profileList.addEventListener('click', event => {
+    const activate = event.target.closest('[data-activate-profile]');
+    const remove = event.target.closest('[data-delete-profile]');
+    if (activate) {
+      persistent.activeProfileId = activate.dataset.activateProfile;
+      save(); renderAll();
+    }
+    if (remove && persistent.profiles.length > 1) {
+      persistent.profiles = persistent.profiles.filter(p => p.id !== remove.dataset.deleteProfile);
+      if (!persistent.profiles.some(p => p.id === persistent.activeProfileId)) persistent.activeProfileId = persistent.profiles[0].id;
+      save(); renderAll();
+    }
+  });
+
+  $('start-custom-button').addEventListener('click', () => {
+    const config = {
+      max:Number(els.customMax.value), attempts:Number(els.customAttempts.value), seconds:Number(els.customSeconds.value),
+      hints:Number(els.customHints.value), powers:els.customPowers.checked, jackpot:els.customJackpot.checked
+    };
+    if (config.max < 10 || config.max > 100000 || config.attempts < 3 || config.attempts > 50 ||
+        config.seconds < 0 || config.seconds > 300 || config.hints < 0 || config.hints > 5) {
+      return toast('Check your custom game settings.');
+    }
+    endCurrentRunForRestart();
+    startCustom(config);
+  });
+
+  let pendingChallenge = null;
+  $('generate-challenge-button').addEventListener('click', () => {
+    const config = {
+      max:Number(els.challengeMax.value), attempts:Number(els.challengeAttempts.value), hints:Number(els.challengeHints.value),
+      seed:Math.floor(100000 + Math.random()*2000000000)
+    };
+    if (config.max < 10 || config.max > 100000 || config.attempts < 3 || config.attempts > 50 || config.hints < 0 || config.hints > 5) {
+      return toast('Check your challenge settings.');
+    }
+    pendingChallenge = {...config, code:encodeChallenge(config)};
+    els.generatedCode.textContent = pendingChallenge.code;
+    els.generatedCodeBox.classList.remove('hidden');
+  });
+
+  $('copy-challenge-button').addEventListener('click', async () => {
+    if (!pendingChallenge) return;
+    try { await navigator.clipboard.writeText(pendingChallenge.code); toast('Challenge code copied.'); }
+    catch { toast(pendingChallenge.code); }
+  });
+
+  $('play-generated-challenge-button').addEventListener('click', () => {
+    if (!pendingChallenge) return;
+    endCurrentRunForRestart();
+    startChallenge({...pendingChallenge});
+  });
+
+  $('join-challenge-button').addEventListener('click', () => {
+    const decoded = decodeChallenge(els.joinChallengeInput.value);
+    if (!decoded) return toast('That challenge code is not valid.');
+    endCurrentRunForRestart();
+    startChallenge(decoded);
+  });
+
+  $('start-tournament-button').addEventListener('click', () => {
+    const profileIds = [...els.tournamentPicker.querySelectorAll('input:checked')].map(input => input.value);
+    const config = {
+      profileIds, rounds:Number(els.tournamentRounds.value), max:Number(els.tournamentMax.value), attempts:Number(els.tournamentAttempts.value)
+    };
+    if (profileIds.length < 3) return toast('Choose at least 3 players.');
+    if (config.rounds < 1 || config.rounds > 5 || config.max < 20 || config.max > 10000 || config.attempts < 3 || config.attempts > 20) {
+      return toast('Check the tournament settings.');
+    }
+    endCurrentRunForRestart();
+    startTournament(config);
+  });
+
   $('stats-button').addEventListener('click', openStats);
   $('settings-button').addEventListener('click', openSettings);
 
