@@ -1,4 +1,4 @@
-const CACHE_NAME = 'guess-arcade-v3';
+const CACHE_NAME = 'guess-arcade-v4';
 const APP_SHELL = [
   './',
   './index.html',
