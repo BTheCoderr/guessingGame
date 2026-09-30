@@ -4,20 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#111827">
-  <meta name="description" content="A polished local-first number guessing arcade with multiple modes, daily challenges, achievements, and offline play.">
+  <meta name="description" content="A local-first number guessing arcade with solo modes, daily challenges, power-ups, combos, and two-player duels.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <title>Guess Arcade</title>
 </head>
 <body>
+  <div id="confetti-layer" class="confetti-layer" aria-hidden="true"></div>
+
   <div class="app-shell">
     <header class="topbar">
       <div class="brand" aria-label="Guess Arcade home">
         <div class="brand-mark" aria-hidden="true">?</div>
         <div>
           <strong>Guess Arcade</strong>
-          <span>Small game. Big upgrade.</span>
+          <span>Read it. Risk it. Hit it.</span>
         </div>
       </div>
       <div class="top-actions">
@@ -31,8 +33,8 @@
       <section class="hero">
         <div class="hero-copy">
           <span class="eyebrow">LOCAL-FIRST ARCADE</span>
-          <h1>Read the signal.<br><span>Find the number.</span></h1>
-          <p>Five ways to play, zero accounts, and every record saved right on your device.</p>
+          <h1>Catch the heat.<br><span>Crack the number.</span></h1>
+          <p>Solo runs, daily puzzles, power-ups, jackpot rounds, and a pass-the-phone two-player battle. No account needed.</p>
         </div>
 
         <div class="hero-stats" aria-label="Player summary">
@@ -41,8 +43,8 @@
             <strong id="hero-best-score">0</strong>
           </div>
           <div class="mini-stat">
-            <span>Win streak</span>
-            <strong id="hero-streak">0</strong>
+            <span>Best combo</span>
+            <strong id="hero-combo">0</strong>
           </div>
           <div class="mini-stat">
             <span>Games</span>
@@ -53,37 +55,49 @@
 
       <section class="mode-strip" aria-label="Game modes">
         <button class="mode-card active" type="button" data-mode="classic">
-          <span class="mode-icon">◎</span>
-          <span><strong>Classic</strong><small>Climb the levels</small></span>
+          <span class="mode-icon">◎</span><span><strong>Classic</strong><small>Climb + combo</small></span>
         </button>
         <button class="mode-card" type="button" data-mode="sprint">
-          <span class="mode-icon">⚡</span>
-          <span><strong>Sprint</strong><small>60-second rush</small></span>
+          <span class="mode-icon">⚡</span><span><strong>Sprint</strong><small>60-second rush</small></span>
         </button>
         <button class="mode-card" type="button" data-mode="survival">
-          <span class="mode-icon">♥</span>
-          <span><strong>Survival</strong><small>Three lives</small></span>
+          <span class="mode-icon">♥</span><span><strong>Survival</strong><small>Protect 3 lives</small></span>
         </button>
         <button class="mode-card" type="button" data-mode="endless">
-          <span class="mode-icon">∞</span>
-          <span><strong>Endless</strong><small>Keep climbing</small></span>
+          <span class="mode-icon">∞</span><span><strong>Endless</strong><small>How far can you go?</small></span>
         </button>
         <button class="mode-card" type="button" data-mode="daily">
-          <span class="mode-icon">◫</span>
-          <span><strong>Daily</strong><small>One puzzle today</small></span>
+          <span class="mode-icon">◫</span><span><strong>Daily</strong><small>7 tries. One target.</small></span>
+        </button>
+        <button class="mode-card duel-mode-card" type="button" data-mode="duel">
+          <span class="mode-icon">⚔</span><span><strong>Duel</strong><small>2 players · first to 3</small></span>
         </button>
       </section>
 
       <section class="game-layout">
-        <article class="game-card">
+        <article class="game-card" id="game-card">
           <div class="game-head">
             <div>
               <span class="eyebrow" id="mode-kicker">CLASSIC MODE</span>
               <h2 id="mode-title">Level 1</h2>
               <p id="mode-description">Find the target and build your score.</p>
             </div>
-            <div class="pill" id="range-pill">1–25</div>
+            <div class="game-head-pills">
+              <div class="pill combo-pill" id="combo-pill">🔥 <span id="combo-value">x1.00</span></div>
+              <div class="pill jackpot-pill hidden" id="jackpot-pill">★ JACKPOT x2</div>
+              <div class="pill" id="range-pill">1–25</div>
+            </div>
           </div>
+
+          <section class="duel-scoreboard hidden" id="duel-scoreboard" aria-label="Duel score">
+            <div class="duel-player active" id="duel-player-1">
+              <span>PLAYER 1</span><strong id="duel-score-1">0</strong>
+            </div>
+            <div class="duel-vs">ROUND <strong id="duel-round">1</strong></div>
+            <div class="duel-player" id="duel-player-2">
+              <span>PLAYER 2</span><strong id="duel-score-2">0</strong>
+            </div>
+          </section>
 
           <div class="signal-card" id="signal-card" aria-live="polite">
             <div class="signal-orb" id="signal-orb">?</div>
@@ -94,7 +108,7 @@
           </div>
 
           <form id="guess-form" class="guess-form" autocomplete="off">
-            <label for="guess-input">Your guess</label>
+            <label for="guess-input" id="guess-label">Your guess</label>
             <div class="guess-row">
               <input id="guess-input" name="guess" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="Enter a number" required>
               <button class="primary-button" id="guess-button" type="submit">Guess</button>
@@ -107,12 +121,28 @@
 
           <div class="meter-wrap">
             <div class="meter-track" aria-hidden="true"><div class="meter-fill" id="meter-fill"></div></div>
-            <div class="meter-labels"><span>Cold</span><span>Close</span><span>Hot</span></div>
+            <div class="meter-labels"><span>Cold</span><span>Close</span><span>🔥 Hot</span></div>
           </div>
 
+          <section class="power-deck" id="power-deck" aria-label="Power ups">
+            <div class="power-copy">
+              <span class="eyebrow">POWER DECK</span>
+              <strong>One use each per run</strong>
+            </div>
+            <button class="power-card" type="button" data-power="scan" id="power-scan">
+              <span>⌖</span><div><strong>Scanner</strong><small>Shrink the range</small></div>
+            </button>
+            <button class="power-card" type="button" data-power="double" id="power-double">
+              <span>×2</span><div><strong>Double Up</strong><small>Next hit pays double</small></div>
+            </button>
+            <button class="power-card" type="button" data-power="lucky" id="power-lucky">
+              <span>?</span><div><strong>Lucky Break</strong><small>Random mode bonus</small></div>
+            </button>
+          </section>
+
           <div class="game-metrics">
-            <div><span>Score</span><strong id="score-value">0</strong></div>
-            <div><span>Attempts</span><strong id="attempts-value">0</strong></div>
+            <div><span id="metric-one-label">Score</span><strong id="score-value">0</strong></div>
+            <div><span id="metric-two-label">Attempts</span><strong id="attempts-value">0</strong></div>
             <div><span id="timer-label">Time</span><strong id="timer-value">—</strong></div>
             <div><span id="resource-label">Hints</span><strong id="resource-value">3</strong></div>
           </div>
@@ -126,10 +156,7 @@
         <aside class="side-stack">
           <section class="panel">
             <div class="panel-head">
-              <div>
-                <span class="eyebrow">ROUND HISTORY</span>
-                <h3>Recent guesses</h3>
-              </div>
+              <div><span class="eyebrow">ROUND HISTORY</span><h3>Recent guesses</h3></div>
               <button class="text-button" id="new-game-button" type="button">New game</button>
             </div>
             <ol class="guess-history" id="guess-history">
@@ -137,15 +164,21 @@
             </ol>
           </section>
 
+          <section class="panel challenge-panel">
+            <div class="panel-head">
+              <div><span class="eyebrow">ARCADE CHALLENGE</span><h3 id="challenge-title">Heat Check</h3></div>
+              <span class="daily-status" id="challenge-status">0/3</span>
+            </div>
+            <p id="challenge-copy">Win three rounds in four guesses or fewer to light up a combo.</p>
+            <div class="challenge-track"><div id="challenge-fill"></div></div>
+          </section>
+
           <section class="panel daily-panel">
             <div class="panel-head">
-              <div>
-                <span class="eyebrow">TODAY</span>
-                <h3>Daily challenge</h3>
-              </div>
+              <div><span class="eyebrow">TODAY</span><h3>Daily challenge</h3></div>
               <span class="daily-status" id="daily-status">Ready</span>
             </div>
-            <p>Everyone gets the same date-seeded puzzle on this device. Solve it in seven tries.</p>
+            <p>Same date-seeded puzzle all day. Seven guesses. No power-ups.</p>
             <div class="daily-meta">
               <span id="daily-date"></span>
               <button class="secondary-button" id="play-daily-button" type="button">Play daily</button>
@@ -154,11 +187,8 @@
 
           <section class="panel achievements-panel">
             <div class="panel-head">
-              <div>
-                <span class="eyebrow">MILESTONES</span>
-                <h3>Achievements</h3>
-              </div>
-              <span id="achievement-count">0/6</span>
+              <div><span class="eyebrow">MILESTONES</span><h3>Achievements</h3></div>
+              <span id="achievement-count">0/10</span>
             </div>
             <div class="achievement-list" id="achievement-list"></div>
           </section>
@@ -174,10 +204,7 @@
         <button class="icon-button" value="close" aria-label="Close stats">×</button>
       </div>
       <div class="stats-grid" id="stats-grid"></div>
-      <div class="history-block">
-        <h3>Recent games</h3>
-        <div id="game-history"></div>
-      </div>
+      <div class="history-block"><h3>Recent games</h3><div id="game-history"></div></div>
     </form>
   </dialog>
 
@@ -187,9 +214,8 @@
         <div><span class="eyebrow">PREFERENCES</span><h2>Settings</h2></div>
         <button class="icon-button" value="close" aria-label="Close settings">×</button>
       </div>
-
       <label class="setting-row">
-        <span><strong>Sound</strong><small>Play subtle game feedback tones.</small></span>
+        <span><strong>Sound</strong><small>Arcade tones for hits, misses, and bonuses.</small></span>
         <input id="sound-toggle" type="checkbox">
       </label>
       <label class="setting-row">
@@ -204,7 +230,6 @@
           <option value="system">System</option>
         </select>
       </label>
-
       <div class="settings-actions">
         <button class="secondary-button" id="export-button" type="button">Export data</button>
         <label class="secondary-button file-button">Import data<input id="import-input" type="file" accept="application/json"></label>
@@ -215,7 +240,6 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
   <script src="guessingGame.js"></script>
 </body>
 </html>
