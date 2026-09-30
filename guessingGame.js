@@ -91,13 +91,15 @@
     newGameButton:$('new-game-button'),
     challengeTitle:$('challenge-title'), challengeStatus:$('challenge-status'), challengeCopy:$('challenge-copy'), challengeFill:$('challenge-fill'),
     dailyDate:$('daily-date'), dailyStatus:$('daily-status'), playDailyButton:$('play-daily-button'),
+    dailyStreak:$('daily-streak'), dailyBestStreak:$('daily-best-streak'), dailyWeek:$('daily-week'),
+    leaderboardList:$('leaderboard-list'), leaderboardCount:$('leaderboard-count'),
     activePlayerBadge:$('active-player-badge'),
     playersDialog:$('players-dialog'), profileList:$('profile-list'), profileNameInput:$('profile-name-input'),
     customDialog:$('custom-dialog'), customMax:$('custom-max'), customAttempts:$('custom-attempts'), customSeconds:$('custom-seconds'),
     customHints:$('custom-hints'), customPowers:$('custom-powers'), customJackpot:$('custom-jackpot'),
     challengeDialog:$('challenge-dialog'), challengeMax:$('challenge-max'), challengeAttempts:$('challenge-attempts'),
     challengeHints:$('challenge-hints'), generatedCodeBox:$('generated-code-box'), generatedCode:$('generated-code'),
-    joinChallengeInput:$('join-challenge-input'),
+    generatedChallengeLink:$('generated-challenge-link'), joinChallengeInput:$('join-challenge-input'),
     tournamentDialog:$('tournament-dialog'), tournamentPicker:$('tournament-picker'), tournamentRounds:$('tournament-rounds'),
     tournamentMax:$('tournament-max'), tournamentAttempts:$('tournament-attempts'),
     tournamentBoard:$('tournament-scoreboard'), tournamentPlayers:$('tournament-players'), tournamentRoundLabel:$('tournament-round-label'),
@@ -124,10 +126,24 @@
     return roll >= previous ? roll + 1 : roll;
   };
   const activeProfile = () => persistent.profiles.find(p => p.id === persistent.activeProfileId) || persistent.profiles[0];
-  const normalizeProfile = p => ({
-    id:p.id, name:p.name,
-    stats:{ games:0, wins:0, bestScore:0, challengesWon:0, tournamentWins:0, ...(p.stats || {}) }
-  });
+  const normalizeProfile = p => {
+    const stats = p.stats || {};
+    return {
+      id:p.id,
+      name:p.name,
+      stats:{
+        games:0,
+        wins:0,
+        bestScore:0,
+        challengesWon:0,
+        tournamentWins:0,
+        soloHits:Number.isFinite(stats.soloHits) ? stats.soloHits : (stats.wins || 0),
+        perfectWins:0,
+        fastestWinMs:0,
+        ...stats
+      }
+    };
+  };
   persistent.profiles = persistent.profiles.map(normalizeProfile);
   if (!persistent.profiles.some(p => p.id === persistent.activeProfileId)) persistent.activeProfileId = persistent.profiles[0]?.id || 'guest';
 
@@ -159,6 +175,28 @@
     if (![max,attempts,hints,seed].every(Number.isFinite)) return null;
     if (max < 10 || max > 100000 || attempts < 3 || attempts > 50 || hints < 0 || hints > 5 || seed < 1) return null;
     return { max, attempts, hints, seed, code:encodeChallenge({max,attempts,hints,seed}) };
+  };
+
+  const challengeLinkForCode = code => {
+    const url = new URL(location.href);
+    url.hash = '';
+    url.search = '';
+    url.searchParams.set('challenge', code);
+    return url.toString();
+  };
+
+  const setChallengeUrl = code => {
+    try {
+      const url = new URL(location.href);
+      if (code) {
+        url.hash = '';
+        url.search = '';
+        url.searchParams.set('challenge', code);
+      } else {
+        url.searchParams.delete('challenge');
+      }
+      history.replaceState(null, '', url);
+    } catch {}
   };
 
   const todayKey = () => {
@@ -298,6 +336,7 @@
     stopTimer();
     const previousTarget = session?.target ?? null;
     session = makeSession(mode, previousTarget);
+    if (mode !== 'challenge') setChallengeUrl(null);
     session.bonusRound = isJackpotLevel();
     setActiveMode(mode);
     resetSignal();
@@ -340,6 +379,7 @@
     stopTimer();
     session = makeSession('challenge');
     session.challengeData = data;
+    setChallengeUrl(data.code);
     session.max = data.max;
     session.target = seededTarget(data.seed, data.max);
     session.hintsLeft = data.hints;
@@ -535,6 +575,14 @@
     persistent.stats.fastestWinMs = persistent.stats.fastestWinMs === 0 ? elapsed : Math.min(persistent.stats.fastestWinMs, elapsed);
     persistent.stats.bestAttempts = persistent.stats.bestAttempts === 0 ? session.roundAttempts : Math.min(persistent.stats.bestAttempts, session.roundAttempts);
     persistent.stats.bestScore = Math.max(persistent.stats.bestScore, session.score);
+
+    const profile = activeProfile();
+    if (profile && !['duel','tournament'].includes(session.mode)) {
+      profile.stats.soloHits = (profile.stats.soloHits || 0) + 1;
+      profile.stats.bestScore = Math.max(profile.stats.bestScore || 0, session.score);
+      profile.stats.fastestWinMs = !profile.stats.fastestWinMs ? elapsed : Math.min(profile.stats.fastestWinMs, elapsed);
+      if (session.roundAttempts === 1) profile.stats.perfectWins = (profile.stats.perfectWins || 0) + 1;
+    }
 
     if (session.roundAttempts === 1) persistent.stats.perfectWins += 1;
     if (session.bonusRound) persistent.stats.bonusWins += 1;
@@ -948,6 +996,7 @@
     renderGuessHistory();
     renderPersistent();
     renderDaily();
+    renderLeaderboard();
     renderChallenge();
     renderPowerDeck();
     renderDuel();
@@ -1071,12 +1120,105 @@
     renderAchievements();
   };
 
+  const dateKeyFromDate = date =>
+    `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+
+  const dayOrdinal = key => {
+    const [y,m,d] = String(key).split('-').map(Number);
+    return Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)
+      ? Math.floor(Date.UTC(y,m-1,d) / 86400000)
+      : NaN;
+  };
+
+  const dailyStreakStats = () => {
+    const completedKeys = Object.entries(persistent.daily)
+      .filter(([,record]) => record?.completed)
+      .map(([key]) => key)
+      .filter(key => Number.isFinite(dayOrdinal(key)))
+      .sort();
+
+    const completed = new Set(completedKeys);
+    let cursor = new Date();
+    cursor.setHours(12,0,0,0);
+    if (!completed.has(dateKeyFromDate(cursor))) cursor.setDate(cursor.getDate()-1);
+
+    let current = 0;
+    while (completed.has(dateKeyFromDate(cursor))) {
+      current += 1;
+      cursor.setDate(cursor.getDate()-1);
+    }
+
+    let best = 0;
+    let run = 0;
+    let previous = null;
+    for (const key of completedKeys) {
+      const ordinal = dayOrdinal(key);
+      run = previous !== null && ordinal === previous + 1 ? run + 1 : 1;
+      best = Math.max(best, run);
+      previous = ordinal;
+    }
+    return { current, best, completed };
+  };
+
   const renderDaily = () => {
     const record = persistent.daily[todayKey()];
+    const streak = dailyStreakStats();
     els.dailyDate.textContent = new Date().toLocaleDateString(undefined,{ weekday:'short', month:'short', day:'numeric' });
     els.dailyStatus.textContent = record?.completed ? (record.won ? 'Solved' : 'Finished') : 'Ready';
     els.dailyStatus.classList.toggle('done', !!record?.completed);
     els.playDailyButton.textContent = record?.completed ? 'View daily' : 'Play daily';
+    els.dailyStreak.textContent = `${streak.current} ${streak.current === 1 ? 'day' : 'days'}`;
+    els.dailyBestStreak.textContent = `${streak.best} ${streak.best === 1 ? 'day' : 'days'}`;
+
+    const days = [];
+    for (let offset=6; offset>=0; offset--) {
+      const date = new Date();
+      date.setHours(12,0,0,0);
+      date.setDate(date.getDate()-offset);
+      const key = dateKeyFromDate(date);
+      days.push(`
+        <div class="streak-day ${streak.completed.has(key) ? 'done' : ''} ${offset === 0 ? 'today' : ''}" title="${date.toLocaleDateString()}">
+          <span>${date.toLocaleDateString(undefined,{weekday:'narrow'})}</span>
+          <strong>${streak.completed.has(key) ? '✓' : '·'}</strong>
+        </div>
+      `);
+    }
+    els.dailyWeek.innerHTML = days.join('');
+  };
+
+  const renderLeaderboard = () => {
+    const ranked = persistent.profiles
+      .map(normalizeProfile)
+      .sort((a,b) =>
+        (b.stats.soloHits - a.stats.soloHits) ||
+        (b.stats.tournamentWins - a.stats.tournamentWins) ||
+        (b.stats.bestScore - a.stats.bestScore) ||
+        ((a.stats.fastestWinMs || Infinity) - (b.stats.fastestWinMs || Infinity)) ||
+        a.name.localeCompare(b.name)
+      );
+
+    els.leaderboardCount.textContent = `${ranked.length} ${ranked.length === 1 ? 'player' : 'players'}`;
+    els.leaderboardList.innerHTML = ranked.map((player,index) => `
+      <div class="leaderboard-row ${player.id === persistent.activeProfileId ? 'active' : ''}">
+        <span class="leaderboard-rank">${index + 1}</span>
+        <div class="leaderboard-player">
+          <strong>${player.name}</strong>
+          <small>${player.stats.soloHits} hits · ${player.stats.tournamentWins} tournament ${player.stats.tournamentWins === 1 ? 'win' : 'wins'}</small>
+        </div>
+        <div class="leaderboard-record">
+          <strong>${Number(player.stats.bestScore || 0).toLocaleString()}</strong>
+          <small>best</small>
+        </div>
+        <div class="leaderboard-record">
+          <strong>${player.stats.perfectWins || 0}</strong>
+          <small>perfect</small>
+        </div>
+        <div class="leaderboard-record">
+          <strong>${player.stats.fastestWinMs ? formatTime(player.stats.fastestWinMs) : '—'}</strong>
+          <small>fast</small>
+        </div>
+      </div>
+    `).join('');
   };
 
   const renderChallenge = () => {
@@ -1242,7 +1384,7 @@
         : session.mode === 'tournament'
           ? `Guess Arcade Tournament — ${session.tournament.players.map(p => `${p.name} ${p.score}`).join(' · ')}.`
           : session.mode === 'challenge'
-            ? `Guess Arcade Challenge ${session.challengeData.code} — ${session.roundAttempts}/${session.attemptLimit} guesses.`
+            ? `Guess Arcade Challenge ${session.challengeData.code} — ${session.roundAttempts}/${session.attemptLimit} guesses. ${challengeLinkForCode(session.challengeData.code)}`
             : `Guess Arcade ${MODES[session.mode].label} — ${session.score} points, level ${session.level}, ${session.combo} combo.`;
 
     try {
@@ -1362,6 +1504,7 @@
     }
     pendingChallenge = {...config, code:encodeChallenge(config)};
     els.generatedCode.textContent = pendingChallenge.code;
+    els.generatedChallengeLink.textContent = challengeLinkForCode(pendingChallenge.code);
     els.generatedCodeBox.classList.remove('hidden');
   });
 
@@ -1369,6 +1512,13 @@
     if (!pendingChallenge) return;
     try { await navigator.clipboard.writeText(pendingChallenge.code); toast('Challenge code copied.'); }
     catch { toast(pendingChallenge.code); }
+  });
+
+  $('copy-challenge-link-button').addEventListener('click', async () => {
+    if (!pendingChallenge) return;
+    const link = challengeLinkForCode(pendingChallenge.code);
+    try { await navigator.clipboard.writeText(link); toast('Challenge link copied.'); }
+    catch { toast('Copy the challenge link shown above.'); }
   });
 
   $('play-generated-challenge-button').addEventListener('click', () => {
@@ -1433,5 +1583,8 @@
 
   applyTheme();
   evaluateAchievements();
-  newSession('classic');
+
+  const initialChallenge = decodeChallenge(new URLSearchParams(location.search).get('challenge'));
+  if (initialChallenge) startChallenge(initialChallenge);
+  else newSession('classic');
 })();
