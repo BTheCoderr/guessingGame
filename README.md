@@ -1,38 +1,55 @@
-# Number Guessing Game
+# Guess Arcade
 
-This is a simple number guessing game where the player has to guess a random number within a specified range.
+A polished local-first revival of the original Number Guessing Game.
 
-## How to Play
+The original project was a small HTML/CSS/JavaScript experiment with one guessing loop. Version 2 keeps that mechanic and turns it into a responsive arcade that works without accounts, cloud storage, or a database.
 
-1. Open the `guessGame.html` file in a web browser.
-2. Select a difficulty level (Easy, Medium, Hard) to define the range within which the random number will be generated.
-3. Guess a number within the specified range and click the "Guess" button.
-4. Receive feedback on whether your guess is too low, too high, or correct.
-5. Continue guessing until you guess the correct number.
-6. The game progresses to the next level, doubling the range and increasing the difficulty.
+## v2 features
 
-## Features
+- Five modes: Classic, Sprint, Survival, Endless, and Daily
+- Progressive number ranges and level-based scoring
+- Hot / warm / cold feedback plus higher / lower signals
+- Hints, timers, lives, and seven-guess daily rules depending on mode
+- Date-seeded daily challenge
+- Persistent player stats, game history, win streaks, and records
+- Six unlockable achievements
+- Light, dark, and system themes
+- Optional sound and haptic feedback
+- JSON backup and restore
+- Shareable results
+- Responsive mobile-first interface
+- Installable PWA with an offline app shell
+- No account system or database required
 
-- Difficulty levels: Easy (1-10), Medium (1-100), Hard (1-1000)
-- Score and level tracking
-- Timer that starts on the first guess
-- Hint system after a certain number of attempts
-- Progressive difficulty with increasing levels
+## Storage
 
-## Files
+Guess Arcade stores gameplay data in `localStorage` under `guess-arcade-v2`.
 
-- `guessGame.html`: HTML file containing the user interface for the game.
-- `styles.css`: CSS file for styling the game interface.
-- `guessGame.js`: JavaScript file containing the game logic.
-- `server.js`: Node.js server file to serve the game.
+That includes:
 
-## How to Run
+- stats and records
+- recent game history
+- unlocked achievements
+- daily challenge results
+- theme, sound, and haptic preferences
 
-1. Ensure you have Node.js installed.
-2. Navigate to the project directory and run:
-    ```bash
-    npm install
-    node server.js
-    ```
-3. Open your web browser and go to `http://localhost:3000` to start playing the game.
-<br><br>
+Data stays on the device unless the player exports a JSON backup.
+
+## Run locally
+
+```bash
+npm install
+npm start
+```
+
+Then open `http://localhost:3000`.
+
+Because the app is static, it can also be served by any static web server.
+
+## Deploy
+
+`netlify.toml` publishes the repository root directly. No environment variables, database, or secrets are required.
+
+## Legacy route
+
+`guessingGame.html` is retained as a compatibility redirect to the new `index.html` experience.
