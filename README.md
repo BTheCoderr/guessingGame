@@ -1,5 +1,9 @@
 # Guess Arcade
 
+[![CI](https://github.com/BTheCoderr/guessingGame/actions/workflows/validate.yml/badge.svg)](https://github.com/BTheCoderr/guessingGame/actions/workflows/validate.yml)
+
+**Live app:** https://guess-arcade.netlify.app
+
 <!-- repo-intro:start -->
 **Project snapshot:** Guess Arcade is a local-first browser game suite that evolves a basic number-guessing exercise into solo, competitive, daily, challenge-link, and local tournament play.
 
